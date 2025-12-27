@@ -1139,7 +1139,9 @@ impl VitypeEngine {
                 let base_vowel = self.get_base_vowel(ch);
                 let base_lower = lower_char(base_vowel);
                 if base_lower != key_lower {
-                    if index == adjacent_index && (base_lower == 'i' || base_lower == 'y') {
+                    if index == adjacent_index
+                        && (base_lower == 'i' || base_lower == 'y' || base_lower == 'u')
+                    {
                         continue;
                     }
                     return None;

@@ -636,4 +636,14 @@ mod key_transformer_tests {
         // deleteCount=2: delete "ên", text="ền": replaces from toned vowel to end
         assert_eq!(tone_action, Some(action(2, "ền")));
     }
+
+    // MARK: - đâu Tests
+
+    #[test]
+    fn testWordDau() {
+        // "đâu" from various input patterns
+        assert_eq!(apply_input("ddaau"), "đâu"); // sequential: dd→đ, aa→â, u
+        assert_eq!(apply_input("dauda"), "đâu"); // free transform both d and a
+        assert_eq!(apply_input("ddaua"), "đâu"); // dd→đ, free transform a...a
+    }
 }

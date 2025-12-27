@@ -179,7 +179,7 @@ Circumflex transforms work even when **consonants separate the two vowels**, as 
 - Maximum search distance: 4 characters
 - Only works for `a`→`â`, `e`→`ê`, `o`→`ô` (not `w` transforms)
 - The first vowel must be a base vowel (a, e, o), not already transformed
-- If another vowel appears between the two matching vowels, no free transform is applied (e.g., `device` stays `device`), except when a trailing glide `i`/`y` sits immediately before the second vowel (e.g., `thoio` → `thôi`)
+- If another vowel appears between the two matching vowels, no free transform is applied (e.g., `device` stays `device`), except when a trailing glide `i`/`y`/`u` sits immediately before the second vowel (e.g., `thoio` → `thôi`, `dauda` → `đâu`)
 
 ### 2.2 W-Transforms (Breve and Horn Vowels)
 

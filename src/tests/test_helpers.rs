@@ -3,7 +3,7 @@
 //
 // Created by Tran Dat on 24/12/25.
 
-use crate::{KeyTransformAction, VitypeEngine};
+use crate::{InputMethod, KeyTransformAction, VitypeEngine};
 
 pub(super) fn action(delete_count: usize, text: &str) -> KeyTransformAction {
     KeyTransformAction {
@@ -40,5 +40,31 @@ pub(super) fn apply_input_with_auto_fix(input: &str, auto_fix_tone: bool) -> Str
         }
     }
 
+    output.into_iter().collect()
+}
+
+pub(super) fn apply_vni_input(input: &str) -> String {
+    apply_vni_input_with_auto_fix(input, true)
+}
+
+pub(super) fn apply_vni_input_with_auto_fix(input: &str, auto_fix_tone: bool) -> String {
+    let mut engine = VitypeEngine::new();
+    engine.input_method = InputMethod::Vni;
+    engine.auto_fix_tone = auto_fix_tone;
+
+    let mut output: Vec<char> = Vec::new();
+    for ch in input.chars() {
+        let ch_str = ch.to_string();
+        if let Some(action) = engine.process(&ch_str) {
+            if action.delete_count > 0 && output.len() >= action.delete_count {
+                for _ in 0..action.delete_count {
+                    output.pop();
+                }
+            }
+            output.extend(action.text.chars());
+        } else {
+            output.push(ch);
+        }
+    }
     output.into_iter().collect()
 }

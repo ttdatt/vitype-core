@@ -2,6 +2,7 @@ mod common;
 mod telex;
 mod vni;
 
+use std::collections::VecDeque;
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
 use std::ptr;
@@ -21,9 +22,25 @@ use vni::is_vni_word_boundary;
 
 // ==================== VitypeEngine ====================
 
+const HISTORY_WORD_LIMIT: usize = 3;
+
+#[derive(Clone, Debug)]
+struct WordSegment {
+    buffer: Vec<char>,
+    raw_buffer: Vec<char>,
+    is_foreign_mode: bool,
+}
+
+#[derive(Clone, Debug)]
+enum HistorySegment {
+    Word(WordSegment),
+    Boundary(Vec<char>),
+}
+
 pub struct VitypeEngine {
     buffer: Vec<char>,
     raw_buffer: Vec<char>,
+    history: VecDeque<HistorySegment>,
     is_foreign_mode: bool,
     last_transform_key: Option<char>,
     last_w_transform_kind: WTransformKind,
@@ -38,6 +55,7 @@ impl VitypeEngine {
         Self {
             buffer: Vec::new(),
             raw_buffer: Vec::new(),
+            history: VecDeque::new(),
             is_foreign_mode: false,
             last_transform_key: None,
             last_w_transform_kind: WTransformKind::None,
@@ -56,7 +74,9 @@ impl VitypeEngine {
         }
 
         if is_word_boundary(ch, self.input_method) {
-            self.reset();
+            self.commit_current_word_to_history_if_needed();
+            self.push_boundary_to_history(ch);
+            self.reset_current_word();
             return None;
         }
 
@@ -456,7 +476,7 @@ impl VitypeEngine {
         self.buffer[start..].iter().collect()
     }
 
-    fn reset(&mut self) {
+    fn reset_current_word(&mut self) {
         self.buffer.clear();
         self.raw_buffer.clear();
         self.last_transform_key = None;
@@ -465,13 +485,121 @@ impl VitypeEngine {
         self.is_foreign_mode = false;
     }
 
+    fn reset(&mut self) {
+        self.reset_current_word();
+        self.history.clear();
+    }
+
+    fn commit_current_word_to_history_if_needed(&mut self) {
+        if self.buffer.is_empty() {
+            // If there's no visible output for the current word, there's nothing meaningful to restore later.
+            // This preserves legacy behavior for edge-cases where raw keystrokes might exist but output doesn't.
+            self.raw_buffer.clear();
+            self.is_foreign_mode = false;
+            return;
+        }
+
+        let buffer = std::mem::take(&mut self.buffer);
+        let raw_buffer = std::mem::take(&mut self.raw_buffer);
+        let is_foreign_mode = self.is_foreign_mode;
+        self.history
+            .push_back(HistorySegment::Word(WordSegment { buffer, raw_buffer, is_foreign_mode }));
+        self.is_foreign_mode = false;
+
+        self.trim_history_to_word_limit();
+    }
+
+    fn push_boundary_to_history(&mut self, ch: char) {
+        match self.history.back_mut() {
+            Some(HistorySegment::Boundary(chars)) => chars.push(ch),
+            _ => self.history.push_back(HistorySegment::Boundary(vec![ch])),
+        }
+        self.trim_history_to_word_limit();
+    }
+
+    fn trim_history_to_word_limit(&mut self) {
+        let mut word_count = self
+            .history
+            .iter()
+            .filter(|seg| matches!(seg, HistorySegment::Word(_)))
+            .count();
+
+        while word_count > HISTORY_WORD_LIMIT {
+            match self.history.pop_front() {
+                Some(HistorySegment::Word(_)) => word_count -= 1,
+                Some(HistorySegment::Boundary(_)) => {}
+                None => break,
+            }
+        }
+
+        // Avoid keeping dangling leading separators that belong to dropped words.
+        while matches!(self.history.front(), Some(HistorySegment::Boundary(_))) {
+            self.history.pop_front();
+        }
+    }
+
+    fn restore_last_word_from_history(&mut self) -> bool {
+        match self.history.pop_back() {
+            Some(HistorySegment::Word(word)) => {
+                self.buffer = word.buffer;
+                self.raw_buffer = word.raw_buffer;
+                self.is_foreign_mode = word.is_foreign_mode;
+                self.last_transform_key = None;
+                self.last_w_transform_kind = WTransformKind::None;
+                self.suppressed_transform_key = None;
+                true
+            }
+            Some(HistorySegment::Boundary(chars)) => {
+                self.history.push_back(HistorySegment::Boundary(chars));
+                false
+            }
+            None => false,
+        }
+    }
+
     fn delete_last_character(&mut self) {
-        self.buffer.pop();
-        self.raw_buffer.pop();
-        self.last_transform_key = None;
-        self.last_w_transform_kind = WTransformKind::None;
-        self.suppressed_transform_key = None;
-        self.is_foreign_mode = self.has_multiple_vowel_clusters(self.buffer.len());
+        if !self.buffer.is_empty() {
+            self.buffer.pop();
+            self.raw_buffer.pop();
+            self.last_transform_key = None;
+            self.last_w_transform_kind = WTransformKind::None;
+            self.suppressed_transform_key = None;
+            self.is_foreign_mode = self.has_multiple_vowel_clusters(self.buffer.len());
+            return;
+        }
+
+        // If we're not currently composing a word, we may be right after boundary characters.
+        match self.history.back_mut() {
+            Some(HistorySegment::Boundary(chars)) => {
+                chars.pop();
+                if chars.is_empty() {
+                    self.history.pop_back();
+                }
+                self.last_transform_key = None;
+                self.last_w_transform_kind = WTransformKind::None;
+                self.suppressed_transform_key = None;
+                self.is_foreign_mode = false;
+
+                // If we just deleted the last boundary, we're now at the end of the previous word.
+                if self.buffer.is_empty() && matches!(self.history.back(), Some(HistorySegment::Word(_))) {
+                    self.restore_last_word_from_history();
+                }
+            }
+            Some(HistorySegment::Word(_)) => {
+                // Cursor is at the end of a previously committed word (no trailing boundary).
+                if self.restore_last_word_from_history() {
+                    if !self.buffer.is_empty() {
+                        self.buffer.pop();
+                        self.raw_buffer.pop();
+                        self.last_transform_key = None;
+                        self.last_w_transform_kind = WTransformKind::None;
+                        self.suppressed_transform_key = None;
+                        self.is_foreign_mode = self.has_multiple_vowel_clusters(self.buffer.len());
+                    }
+                }
+            }
+            None => {}
+        }
     }
 }
 

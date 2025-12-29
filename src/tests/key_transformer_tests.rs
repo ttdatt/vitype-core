@@ -11,6 +11,26 @@ use super::test_helpers::{action, apply_input};
 
 mod key_transformer_tests {
     use super::{action, apply_input, VitypeEngine};
+    use crate::HistorySegment;
+
+    fn apply_key(engine: &mut VitypeEngine, output: &mut Vec<char>, ch: char) {
+        let ch_str = ch.to_string();
+        if let Some(action) = engine.process(&ch_str) {
+            if action.delete_count > 0 && output.len() >= action.delete_count {
+                for _ in 0..action.delete_count {
+                    output.pop();
+                }
+            }
+            output.extend(action.text.chars());
+        } else {
+            output.push(ch);
+        }
+    }
+
+    fn backspace(engine: &mut VitypeEngine, output: &mut Vec<char>) {
+        engine.delete_last_character();
+        output.pop();
+    }
 
     // MARK: - Consonant Tests (dd -> đ)
 
@@ -104,6 +124,92 @@ mod key_transformer_tests {
     fn testInvalidSyllableDisablesTransformsUntilBoundary() {
         assert_eq!(apply_input("devicee"), "devicee");
         assert_eq!(apply_input("device aa"), "device â");
+    }
+
+    #[test]
+    fn testBackspaceAcrossWordBoundaryCanEditPreviousTone() {
+        let mut engine = VitypeEngine::new();
+        let mut output: Vec<char> = Vec::new();
+
+        for ch in "tas ".chars() {
+            apply_key(&mut engine, &mut output, ch);
+        }
+        assert_eq!(output.iter().collect::<String>(), "tá ");
+
+        // Backspace deletes the boundary (space) and restores the last word into the active buffer.
+        backspace(&mut engine, &mut output);
+        assert_eq!(output.iter().collect::<String>(), "tá");
+
+        // Now that we're back inside the previous word, tone removal should apply.
+        apply_key(&mut engine, &mut output, 'z');
+        assert_eq!(output.iter().collect::<String>(), "ta");
+
+        // And we can continue typing boundaries as usual.
+        apply_key(&mut engine, &mut output, 's');
+        assert_eq!(output.iter().collect::<String>(), "tá");
+    }
+
+    #[test]
+    fn testWordHistoryIsLimitedToRecentWords() {
+        let mut engine = VitypeEngine::new();
+        let mut output: Vec<char> = Vec::new();
+
+        // Commit 5 words, each followed by a boundary (space)
+        for _ in 0..5 {
+            for ch in "ta ".chars() {
+                apply_key(&mut engine, &mut output, ch);
+            }
+        }
+
+        let word_count = engine
+            .history
+            .iter()
+            .filter(|seg| matches!(seg, HistorySegment::Word(_)))
+            .count();
+        assert_eq!(word_count, 3);
+        assert_eq!(output.iter().collect::<String>(), "ta ta ta ta ta ");
+    }
+
+    #[test]
+    fn testBackspaceThreeThenTonePreviousWordInSentence() {
+        let mut engine = VitypeEngine::new();
+        let mut output: Vec<char> = Vec::new();
+
+        // "chans" -> "chán", "ddi" -> "đi"
+        for ch in "chans qua ddi".chars() {
+            apply_key(&mut engine, &mut output, ch);
+        }
+        assert_eq!(output.iter().collect::<String>(), "chán qua đi");
+
+        // Backspace 3 times: delete 'i', 'đ', and the preceding space.
+        for _ in 0..3 {
+            backspace(&mut engine, &mut output);
+        }
+        assert_eq!(output.iter().collect::<String>(), "chán qua");
+
+        // Apply sắc tone to "qua" -> "quá"
+        apply_key(&mut engine, &mut output, 's');
+        assert_eq!(output.iter().collect::<String>(), "chán quá");
+    }
+
+    #[test]
+    fn testBackspaceThreeThenTransformPreviousWordInSentence() {
+        let mut engine = VitypeEngine::new();
+        let mut output: Vec<char> = Vec::new();
+
+        for ch in "chans qua ddi".chars() {
+            apply_key(&mut engine, &mut output, ch);
+        }
+        assert_eq!(output.iter().collect::<String>(), "chán qua đi");
+
+        for _ in 0..3 {
+            backspace(&mut engine, &mut output);
+        }
+        assert_eq!(output.iter().collect::<String>(), "chán qua");
+
+        // Apply breve transform to 'a' via 'w': "qua" -> "quă"
+        apply_key(&mut engine, &mut output, 'w');
+        assert_eq!(output.iter().collect::<String>(), "chán quă");
     }
 
     #[test]

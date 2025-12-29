@@ -657,7 +657,7 @@ static VNI_VOWEL_TRANSFORMS: Lazy<HashMap<char, Vec<(char, char)>>> = Lazy::new(
 
 The `VitypeEngine::process` method for VNI follows this order:
 
-1. **Word boundary check** → Reset buffer and return `nil` (digits excluded)
+1. **Word boundary check** → Commit the current word into a small internal history window, clear the active word buffers, and return `nil` (digits excluded)
 2. **Escape sequence check** → Return undo action if matched
 3. **Append to buffer**
 4. **Consonant transform** → Check for `d9` → `đ`
@@ -665,6 +665,9 @@ The `VitypeEngine::process` method for VNI follows this order:
 6. **Tone mark** → Check for `1`/`2`/`3`/`4`/`5`/`0` keys
 7. **Auto Fix Tone** → Reposition tone if a vowel was added (when enabled)
 8. **Invalid syllable check** → Revert to raw text and enter foreign mode if needed
+
+Notes:
+- The engine keeps a small history (currently **3 words**) so that if the user **backspaces across a word boundary**, the previous word can be restored into the active buffer and VNI tone/transform keys can still be applied.
 
 ### 8.3 Key Differences from Telex Processing
 

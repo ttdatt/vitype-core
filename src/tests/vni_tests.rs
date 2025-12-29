@@ -41,6 +41,25 @@ fn apply_vni_input_with_auto_fix(input: &str, auto_fix_tone: bool) -> String {
     output.into_iter().collect()
 }
 
+fn apply_key(engine: &mut VitypeEngine, output: &mut Vec<char>, ch: char) {
+    let ch_str = ch.to_string();
+    if let Some(action) = engine.process(&ch_str) {
+        if action.delete_count > 0 && output.len() >= action.delete_count {
+            for _ in 0..action.delete_count {
+                output.pop();
+            }
+        }
+        output.extend(action.text.chars());
+    } else {
+        output.push(ch);
+    }
+}
+
+fn backspace(engine: &mut VitypeEngine, output: &mut Vec<char>) {
+    engine.delete_last_character();
+    output.pop();
+}
+
 // ==================== Basic Consonant Tests ====================
 
 #[test]
@@ -407,6 +426,67 @@ fn test_vni_numbers_not_word_boundaries() {
 fn test_vni_space_is_word_boundary() {
     // Space should reset buffer
     assert_eq!(apply_vni_input("a a1"), "a á");
+}
+
+#[test]
+fn test_vni_backspace_across_word_boundary_can_edit_previous_tone() {
+    let mut engine = create_vni_engine();
+    let mut output: Vec<char> = Vec::new();
+
+    for ch in "a1 ".chars() {
+        apply_key(&mut engine, &mut output, ch);
+    }
+    assert_eq!(output.iter().collect::<String>(), "á ");
+
+    // Backspace deletes the boundary (space) and restores the last word into the active buffer.
+    backspace(&mut engine, &mut output);
+    assert_eq!(output.iter().collect::<String>(), "á");
+
+    // Now that we're back inside the previous word, tone removal should apply (VNI '0').
+    apply_key(&mut engine, &mut output, '0');
+    assert_eq!(output.iter().collect::<String>(), "a");
+}
+
+#[test]
+fn test_vni_backspace_three_then_tone_previous_word_in_sentence() {
+    let mut engine = create_vni_engine();
+    let mut output: Vec<char> = Vec::new();
+
+    // "chan1" -> "chán", "di9" -> "đi"
+    for ch in "chan1 qua di9".chars() {
+        apply_key(&mut engine, &mut output, ch);
+    }
+    assert_eq!(output.iter().collect::<String>(), "chán qua đi");
+
+    // Backspace 3 times: delete 'i', 'đ', and the preceding space.
+    for _ in 0..3 {
+        backspace(&mut engine, &mut output);
+    }
+    assert_eq!(output.iter().collect::<String>(), "chán qua");
+
+    // Apply sắc tone to "qua" -> "quá" (VNI '1')
+    apply_key(&mut engine, &mut output, '1');
+    assert_eq!(output.iter().collect::<String>(), "chán quá");
+}
+
+#[test]
+fn test_vni_backspace_three_then_transform_previous_word_in_sentence() {
+    let mut engine = create_vni_engine();
+    let mut output: Vec<char> = Vec::new();
+
+    for ch in "chan1 qua di9".chars() {
+        apply_key(&mut engine, &mut output, ch);
+    }
+    assert_eq!(output.iter().collect::<String>(), "chán qua đi");
+
+    for _ in 0..3 {
+        backspace(&mut engine, &mut output);
+    }
+    assert_eq!(output.iter().collect::<String>(), "chán qua");
+
+    // Apply breve transform to 'a' via '8': "qua" -> "quă"
+    apply_key(&mut engine, &mut output, '8');
+    assert_eq!(output.iter().collect::<String>(), "chán quă");
 }
 
 // ==================== Tone Placement Tests ====================

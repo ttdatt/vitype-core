@@ -844,7 +844,7 @@ The Rust API exposes this as `VitypeEngine::auto_fix_tone`. The C FFI can toggle
 
 The `VitypeEngine::process` method follows this order:
 
-1. **Word boundary check** → Reset buffer and return `nil`
+1. **Word boundary check** → Commit the current word into a small internal history window, clear the active word buffers, and return `nil`
 2. **Escape sequence check** → Return undo action if matched
 3. **Append to buffer**
 4. **Consonant transform** → Check for `dd` → `đ`
@@ -852,6 +852,9 @@ The `VitypeEngine::process` method follows this order:
 6. **Tone mark** → Find target vowel and apply tone
 7. **Auto Fix Tone** → Reposition tone if a vowel was added (when enabled)
 8. **Invalid syllable check** → Revert to raw text and enter foreign mode if needed
+
+Notes:
+- The engine keeps a small history (currently **3 words**) so that if the user **backspaces across a word boundary**, the previous word can be restored into the active buffer and tone/diacritic edits can still be applied.
 
 ### 8.3 KeyTransformAction
 

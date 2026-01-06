@@ -514,10 +514,13 @@ The `u` immediately following `q` is part of the consonant onset, not a syllable
 
 #### 4.6.2 The `uy` Vowel Cluster
 
-The `uy` vowel cluster has special tone placement rules:
+The `uy` vowel cluster has special tone placement rules, depending on the **Tone Placement Mode**:
 
-- **`uy` alone** (no final consonant): tone goes on `u` → `úy`
-- **`uy` + consonant(s)**: tone goes on `y` → `uýnh`, `uýt`, etc.
+- **Orthographic** (default):
+  - **`uy` alone** (no final consonant): tone goes on `u` → `úy`
+  - **`uy` + consonant(s)**: tone goes on `y` → `uýnh`, `uýt`, etc.
+- **Nucleus-only**:
+  - Tone always goes on `y` (treat `y` as the nucleus): `uý`, `uýnh`, `uýt`, etc.
 
 | Input | Has Final Consonant | Tone Position | Result |
 |-------|---------------------|---------------|--------|
@@ -528,6 +531,8 @@ The `uy` vowel cluster has special tone placement rules:
 | `quyf` | No | y | quỳ |
 
 **Note**: For `quy`, the `u` after `q` is part of the consonant cluster (see 4.6.1), so `quy` has only one vowel (`y`) and the tone naturally goes on `y`.
+
+**Nucleus-only mode** example: `uys` → `uý` (tone on `y`).
 
 **Without this rule**, `uynhs` would incorrectly produce `úynh` (tone on `u` as first of two vowels).
 
@@ -555,18 +560,26 @@ The `gi` cluster has conditional behavior depending on what follows:
 
 **Without this rule**, `gias` would incorrectly produce `gía` (tone on `i` as first of two vowels).
 
-#### 4.6.4 The `oa` Cluster with Final Consonants
+#### 4.6.4 The `oa` Cluster
 
-When **two regular vowels** are followed by a **final consonant**, the tone goes on the **second vowel**:
+The `oa` cluster (and similar `oe`) is the most visible difference between **Orthographic** vs **Nucleus-only** tone placement:
 
-| Input | Has Final Consonant | Tone Position | Result |
-|-------|---------------------|---------------|--------|
-| `toanf` | Yes (n) | a | toàn |
-| `hoanhf` | Yes (nh) | a | hoành |
-| `toenf` | Yes (n) | e | toèn |
-| `tienf` | Yes (n) | e | tièn |
+- **Orthographic** (default):
+  - `oa` with **no** final consonant → tone on `o`: `hóa`, `hòa`, ...
+  - `oa` with a final consonant → tone on `a`: `toàn`, `hoành`, ...
+- **Nucleus-only**:
+  - Tone always goes on the nucleus (`a`/`e`): `hoá`, `hoà`, `khoẻ`, `toàn`, ...
 
-**Without this rule**, `toanf` would incorrectly produce `tòan` (tone on `o`).
+| Input | Mode | Result |
+|-------|------|--------|
+| `hoas` | Orthographic | hóa |
+| `hoas` | Nucleus-only | hoá |
+| `khoer` | Orthographic | khỏe |
+| `khoer` | Nucleus-only | khoẻ |
+| `toanf` | Orthographic | toàn |
+| `toanf` | Nucleus-only | toàn |
+
+**Note**: In **Orthographic** mode, without the “final consonant → second vowel” sub-rule, `toanf` would incorrectly produce `tòan` (tone on `o`).
 
 ### 4.7 Auto Fix Tone (Dynamic Tone Repositioning)
 
@@ -835,6 +848,10 @@ fn reposition_tone_if_needed(&mut self, suppressed_last_char: bool, min_start_of
 ```rust
 // Auto Fix Tone: automatically reposition tone marks when adding vowels
 auto_fix_tone: bool // Default: true
+
+// Tone Placement: controls how tones are positioned in vowel clusters
+// 0 = Orthographic (default), 1 = Nucleus-only
+tone_placement: TonePlacement
 ```
 
 The Rust API exposes this as `VitypeEngine::auto_fix_tone`. The C FFI can toggle it via
@@ -900,6 +917,9 @@ void vitype_engine_free(VitypeEngine *engine);
 void vitype_engine_reset(VitypeEngine *engine);
 void vitype_engine_delete_last_character(VitypeEngine *engine);
 void vitype_engine_set_auto_fix_tone(VitypeEngine *engine, bool enabled);
+void vitype_engine_set_input_method(VitypeEngine *engine, int32_t method);
+void vitype_engine_set_output_encoding(VitypeEngine *engine, int32_t encoding);
+void vitype_engine_set_tone_placement(VitypeEngine *engine, int32_t placement);
 VitypeTransformResult vitype_engine_process(VitypeEngine *engine, const char *input_utf8);
 void vitype_engine_free_string(char *text);
 ```

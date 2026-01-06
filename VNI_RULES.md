@@ -354,6 +354,10 @@ tằ + 0 → tă  (removes tone, keeps breve)
 
 Vietnamese has specific orthographic rules for where tone marks are placed in vowel clusters. These rules are identical to Telex.
 
+ViType also supports a **Tone Placement Mode** setting:
+- **Orthographic** (default): follow standard Vietnamese orthography
+- **Nucleus-only**: put the tone on the syllable nucleus in ambiguous 2-vowel clusters (notably `oa`/`oe` and `uy`)
+
 ### 4.1 Vietnamese Syllable Structure
 
 A Vietnamese syllable has the structure:
@@ -389,6 +393,10 @@ The algorithm finds the target vowel in this priority order:
 3. **Two regular vowels** → **second** vowel if followed by a final consonant; otherwise **first**
 4. **Three or more regular vowels** → **middle** vowel takes the tone
 
+**Nucleus-only mode override (2-vowel clusters):**
+- `oa` / `oe` → tone on `a` / `e` (e.g., `hoa1` → `hoá`, `khoe3` → `khoẻ`)
+- `uy` → tone on `y` (e.g., `uy1` → `uý`)
+
 ### 4.4 Tone Placement Examples
 
 | Word | Input | Vowels | Rule Applied | Result |
@@ -421,10 +429,13 @@ The `u` immediately following `q` is part of the consonant onset, not a syllable
 
 #### 4.5.2 The `uy` Vowel Cluster
 
-The `uy` vowel cluster has special tone placement rules:
+The `uy` vowel cluster has special tone placement rules, depending on the **Tone Placement Mode**:
 
-- **`uy` alone** (no final consonant): tone goes on `u` → `úy`
-- **`uy` + consonant(s)**: tone goes on `y` → `uýnh`, `uýt`, etc.
+- **Orthographic** (default):
+  - **`uy` alone** (no final consonant): tone goes on `u` → `úy`
+  - **`uy` + consonant(s)**: tone goes on `y` → `uýnh`, `uýt`, etc.
+- **Nucleus-only**:
+  - Tone always goes on `y`: `uý`, `uýnh`, `uýt`, etc.
 
 | Input | Has Final Consonant | Tone Position | Result |
 |-------|---------------------|---------------|--------|
@@ -432,6 +443,8 @@ The `uy` vowel cluster has special tone placement rules:
 | `uynh1` | Yes (nh) | y | uýnh |
 | `uyt1` | Yes (t) | y | uýt |
 | `huynh2` | Yes (nh) | y | huỳnh |
+
+**Nucleus-only mode** example: `uy1` → `uý` (tone on `y`).
 
 #### 4.5.3 The `gi` Cluster
 

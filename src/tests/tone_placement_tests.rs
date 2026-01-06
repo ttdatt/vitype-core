@@ -7,7 +7,10 @@
 
 use crate::VitypeEngine;
 
-use super::test_helpers::{action, apply_input, apply_input_with_auto_fix};
+use super::test_helpers::{
+    action, apply_input, apply_input_with_auto_fix, apply_input_with_tone_placement,
+};
+use crate::TonePlacement;
 
 // MARK: - Auto Fix Tone Tests
 mod auto_fix_tone_tests {
@@ -423,6 +426,56 @@ mod uy_tone_placement_tests {
     fn testUYNToneOnY() {
         let result = apply_input("uyns");
         assert_eq!(result, "uýn");
+    }
+}
+
+// MARK: - Tone Placement Mode Tests
+mod tone_placement_mode_tests {
+    use super::{apply_input_with_tone_placement, TonePlacement};
+
+    #[test]
+    fn testNucleusOnlyUYAloneToneOnY() {
+        // Nucleus-only mode: "uy" alone → tone goes on y (uý), not u (úy)
+        let result = apply_input_with_tone_placement("uys", TonePlacement::NucleusOnly);
+        assert_eq!(result, "uý");
+    }
+
+    #[test]
+    fn testNucleusOnlyUYAloneAllTones() {
+        assert_eq!(
+            apply_input_with_tone_placement("uys", TonePlacement::NucleusOnly),
+            "uý"
+        ); // sắc
+        assert_eq!(
+            apply_input_with_tone_placement("uyf", TonePlacement::NucleusOnly),
+            "uỳ"
+        ); // huyền
+        assert_eq!(
+            apply_input_with_tone_placement("uyr", TonePlacement::NucleusOnly),
+            "uỷ"
+        ); // hỏi
+        assert_eq!(
+            apply_input_with_tone_placement("uyx", TonePlacement::NucleusOnly),
+            "uỹ"
+        ); // ngã
+        assert_eq!(
+            apply_input_with_tone_placement("uyj", TonePlacement::NucleusOnly),
+            "uỵ"
+        ); // nặng
+    }
+
+    #[test]
+    fn testNucleusOnlyHoaToneOnA() {
+        // Nucleus-only mode: "hoa" → tone goes on a (hoá), not o (hóa)
+        let result = apply_input_with_tone_placement("hoas", TonePlacement::NucleusOnly);
+        assert_eq!(result, "hoá");
+    }
+
+    #[test]
+    fn testNucleusOnlyKhoeToneOnE() {
+        // Nucleus-only mode: "khoe" → tone goes on e (khoẻ), not o (khỏe)
+        let result = apply_input_with_tone_placement("khoer", TonePlacement::NucleusOnly);
+        assert_eq!(result, "khoẻ");
     }
 }
 

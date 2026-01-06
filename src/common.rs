@@ -19,6 +19,14 @@ pub(crate) enum InputMethod {
     Vni = 1,
 }
 
+#[repr(C)]
+#[derive(Clone, Copy, PartialEq, Default)]
+pub(crate) enum TonePlacement {
+    #[default]
+    Orthographic = 0,
+    NucleusOnly = 1,
+}
+
 #[derive(Clone, Copy, PartialEq)]
 pub(crate) enum WTransformKind {
     None,

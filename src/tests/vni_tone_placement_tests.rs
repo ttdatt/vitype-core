@@ -1,6 +1,6 @@
 #![allow(non_snake_case)]
 
-use super::test_helpers::apply_vni_input;
+use super::test_helpers::{apply_vni_input, apply_vni_input_with_tone_placement};
 
 // MARK: - VNI Tone Placement (same algorithm as Telex, different keys)
 
@@ -103,4 +103,32 @@ mod vni_nucleus_only_tests {
     }
 }
 
+mod vni_tone_placement_mode_tests {
+    use crate::TonePlacement;
 
+    use super::apply_vni_input_with_tone_placement;
+
+    #[test]
+    fn testNucleusOnlyUYAloneToneOnY() {
+        assert_eq!(
+            apply_vni_input_with_tone_placement("uy1", TonePlacement::NucleusOnly),
+            "uý"
+        );
+    }
+
+    #[test]
+    fn testNucleusOnlyHoaToneOnA() {
+        assert_eq!(
+            apply_vni_input_with_tone_placement("hoa1", TonePlacement::NucleusOnly),
+            "hoá"
+        );
+    }
+
+    #[test]
+    fn testNucleusOnlyKhoeToneOnE() {
+        assert_eq!(
+            apply_vni_input_with_tone_placement("khoe3", TonePlacement::NucleusOnly),
+            "khoẻ"
+        );
+    }
+}

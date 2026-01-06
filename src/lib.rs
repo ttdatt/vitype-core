@@ -9,7 +9,9 @@ use std::ptr;
 use unicode_normalization::UnicodeNormalization;
 
 // Re-export crate-visible types from common (keep public API surface minimal)
-pub(crate) use common::{InputMethod, KeyTransformAction, OutputEncoding, WTransformKind};
+pub(crate) use common::{
+    InputMethod, KeyTransformAction, OutputEncoding, TonePlacement, WTransformKind,
+};
 
 // Use internal items from common
 use common::{
@@ -46,6 +48,7 @@ pub struct VitypeEngine {
     last_w_transform_kind: WTransformKind,
     suppressed_transform_key: Option<char>,
     auto_fix_tone: bool,
+    tone_placement: TonePlacement,
     output_encoding: OutputEncoding,
     input_method: InputMethod,
 }
@@ -61,6 +64,7 @@ impl VitypeEngine {
             last_w_transform_kind: WTransformKind::None,
             suppressed_transform_key: None,
             auto_fix_tone: true,
+            tone_placement: TonePlacement::Orthographic,
             output_encoding: OutputEncoding::Unicode,
             input_method: InputMethod::Telex,
         }
@@ -146,7 +150,9 @@ impl VitypeEngine {
 
         if self.auto_fix_tone && is_vowel(ch) {
             if let Some(action) = self.reposition_tone_if_needed(true, None) {
-                if let Some(fallback) = self.handle_invalid_syllable_if_needed(previous_buffer_count) {
+                if let Some(fallback) =
+                    self.handle_invalid_syllable_if_needed(previous_buffer_count)
+                {
                     return Some(fallback);
                 }
                 return Some(action);
@@ -155,7 +161,8 @@ impl VitypeEngine {
 
         if self.auto_fix_tone && !is_vowel(ch) {
             if let Some(action) = self.reposition_tone_if_needed(true, None) {
-                if let Some(fallback) = self.handle_invalid_syllable_if_needed(previous_buffer_count)
+                if let Some(fallback) =
+                    self.handle_invalid_syllable_if_needed(previous_buffer_count)
                 {
                     return Some(fallback);
                 }
@@ -394,6 +401,21 @@ impl VitypeEngine {
         }
 
         if vowel_indices.len() == 2 {
+            if self.tone_placement == TonePlacement::NucleusOnly {
+                let first_vowel = self.buffer[vowel_indices[0]];
+                let second_vowel = self.buffer[vowel_indices[1]];
+                let first_base = lower_char(self.get_base_vowel(first_vowel));
+                let second_base = lower_char(self.get_base_vowel(second_vowel));
+
+                // Nucleus-only overrides for the vowel clusters where the orthographic rules
+                // may place tone on a glide-like vowel ("oa", "oe", "uy").
+                if (first_base == 'u' && second_base == 'y')
+                    || (first_base == 'o' && (second_base == 'a' || second_base == 'e'))
+                {
+                    return Some(vowel_indices[1]);
+                }
+            }
+
             let has_final_consonant = vowel_indices[1] + 1 < before;
 
             if has_final_consonant {
@@ -507,8 +529,11 @@ impl VitypeEngine {
         let buffer = std::mem::take(&mut self.buffer);
         let raw_buffer = std::mem::take(&mut self.raw_buffer);
         let is_foreign_mode = self.is_foreign_mode;
-        self.history
-            .push_back(HistorySegment::Word(WordSegment { buffer, raw_buffer, is_foreign_mode }));
+        self.history.push_back(HistorySegment::Word(WordSegment {
+            buffer,
+            raw_buffer,
+            is_foreign_mode,
+        }));
         self.is_foreign_mode = false;
 
         self.trim_history_to_word_limit();
@@ -586,7 +611,9 @@ impl VitypeEngine {
                 self.is_foreign_mode = false;
 
                 // If we just deleted the last boundary, we're now at the end of the previous word.
-                if self.buffer.is_empty() && matches!(self.history.back(), Some(HistorySegment::Word(_))) {
+                if self.buffer.is_empty()
+                    && matches!(self.history.back(), Some(HistorySegment::Word(_)))
+                {
                     self.restore_last_word_from_history();
                 }
             }
@@ -712,6 +739,19 @@ pub extern "C" fn vitype_engine_set_output_encoding(engine: *mut VitypeEngine, e
 }
 
 #[no_mangle]
+pub extern "C" fn vitype_engine_set_tone_placement(engine: *mut VitypeEngine, placement: i32) {
+    if engine.is_null() {
+        return;
+    }
+    unsafe {
+        (*engine).tone_placement = match placement {
+            1 => TonePlacement::NucleusOnly,
+            _ => TonePlacement::Orthographic,
+        };
+    }
+}
+
+#[no_mangle]
 pub extern "C" fn vitype_engine_process(
     engine: *mut VitypeEngine,
     input_utf8: *const c_char,
@@ -726,9 +766,8 @@ pub extern "C" fn vitype_engine_process(
         Err(_) => return empty_result(),
     };
 
-    let (action, output_encoding) = unsafe {
-        ((*engine).process(input_str), (*engine).output_encoding)
-    };
+    let (action, output_encoding) =
+        unsafe { ((*engine).process(input_str), (*engine).output_encoding) };
     match action {
         Some(action) => {
             let output_text = convert_to_output_encoding(action.text, output_encoding);

@@ -481,18 +481,31 @@ impl VitypeEngine {
         let trigger_index = self.buffer.len() - 1;
         let vowel_index = self.find_target_vowel_index(trigger_index)?;
         let vowel = self.buffer[vowel_index];
-        let delete_count = trigger_index - vowel_index;
+        let mut start_index = vowel_index;
+        if let Some(earliest) = self.clear_other_tones(vowel_index, trigger_index) {
+            if earliest < start_index {
+                start_index = earliest;
+            }
+        }
 
         if ch_lower == 'z' {
             let base_vowel = self.get_base_vowel(vowel);
-            if base_vowel == vowel {
+            let mut changed = false;
+            if base_vowel != vowel {
+                self.buffer[vowel_index] = base_vowel;
+                changed = true;
+            }
+            if start_index != vowel_index {
+                changed = true;
+            }
+            if !changed {
                 return None;
             }
-            self.buffer[vowel_index] = base_vowel;
             self.buffer.pop();
             self.last_transform_key = Some('z');
             self.last_w_transform_kind = WTransformKind::None;
-            let output_text = self.buffer_string_from(vowel_index);
+            let delete_count = trigger_index - start_index;
+            let output_text = self.buffer_string_from(start_index);
             return Some(KeyTransformAction {
                 delete_count,
                 text: output_text,
@@ -508,7 +521,8 @@ impl VitypeEngine {
         self.last_transform_key = Some(ch);
         self.last_w_transform_kind = WTransformKind::None;
 
-        let output_text = self.buffer_string_from(vowel_index);
+        let delete_count = trigger_index - start_index;
+        let output_text = self.buffer_string_from(start_index);
         Some(KeyTransformAction {
             delete_count,
             text: output_text,

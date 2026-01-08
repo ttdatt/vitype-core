@@ -554,6 +554,16 @@ mod compound_uow_transform_tests {
     }
 
     #[test]
+    fn testMuonToneOverrideAfterW() {
+        // "muwjowjn" → "mượn" (tone applied early, then re-applied after ow)
+        assert_eq!(apply_input("muwjowjn"), "mượn");
+        // "mwjonwj" → "mượn" (w as ư, tone applied early, then re-applied)
+        assert_eq!(apply_input("mwjonwj"), "mượn");
+        // "mwjon" → "mượn" (auto-fix ưo + consonant → ươ + consonant)
+        assert_eq!(apply_input("mwjon"), "mượn");
+    }
+
+    #[test]
     fn testQUClusterNoCompound() {
         // "qu" is a consonant cluster, so uow compound shouldn't turn it into "qươ"
         // "quow" should behave like plain ow → ơ

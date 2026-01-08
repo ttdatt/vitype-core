@@ -322,6 +322,16 @@ fn test_vni_uoc71_with_tone() {
     assert_eq!(apply_vni_input("uoc71"), "ước");
 }
 
+#[test]
+fn test_vni_muon_tone_override_after_7() {
+    // "mu7o5n" → "mượn" (auto-fix ưo + consonant → ươ + consonant, keep nặng tone)
+    assert_eq!(apply_vni_input("mu7o5n"), "mượn");
+    // "mu75on" → "mượn" (tone on ư first, then auto-fix on final consonant)
+    assert_eq!(apply_vni_input("mu75on"), "mượn");
+    // "mu7on5" → "mượn" (tone after final consonant)
+    assert_eq!(apply_vni_input("mu7on5"), "mượn");
+}
+
 // ==================== Full Word Tests ====================
 
 #[test]

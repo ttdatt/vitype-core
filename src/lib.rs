@@ -148,6 +148,13 @@ impl VitypeEngine {
             return Some(action);
         }
 
+        if let Some(action) = self.try_auto_fix_uhorn_o_before_consonant(ch) {
+            if let Some(fallback) = self.handle_invalid_syllable_if_needed(previous_buffer_count) {
+                return Some(fallback);
+            }
+            return Some(action);
+        }
+
         if self.auto_fix_tone && is_vowel(ch) {
             if let Some(action) = self.reposition_tone_if_needed(true, None) {
                 if let Some(fallback) =
@@ -259,6 +266,86 @@ impl VitypeEngine {
         }
         let output_text = self.buffer_string_from(start_offset);
 
+        Some(KeyTransformAction {
+            delete_count,
+            text: output_text,
+        })
+    }
+
+    fn try_auto_fix_uhorn_o_before_consonant(
+        &mut self,
+        ch: char,
+    ) -> Option<KeyTransformAction> {
+        if is_vowel(ch) {
+            return None;
+        }
+
+        if self.buffer.len() < 3 {
+            return None;
+        }
+
+        let last_index = self.buffer.len() - 1;
+        if is_vowel(self.buffer[last_index]) {
+            return None;
+        }
+
+        let mut scan_index = last_index;
+        while scan_index > 0 && !is_vowel(self.buffer[scan_index]) {
+            scan_index -= 1;
+        }
+
+        if !is_vowel(self.buffer[scan_index]) {
+            return None;
+        }
+
+        let o_index = scan_index;
+        let o_char = self.buffer[o_index];
+        let o_base = self.get_base_vowel(o_char);
+        if lower_char(o_base) != 'o' {
+            return None;
+        }
+        if o_index == 0 {
+            return None;
+        }
+
+        let u_index = o_index - 1;
+        let u_char = self.buffer[u_index];
+        let u_base = self.get_base_vowel(u_char);
+        if lower_char(u_base) != 'ư' {
+            return None;
+        }
+
+        if u_index > 0 {
+            let prev_char = self.buffer[u_index - 1];
+            if prev_char == 'q' || prev_char == 'Q' {
+                return None;
+            }
+        }
+
+        let horn_base = if o_base.is_uppercase() { 'Ơ' } else { 'ơ' };
+        let new_o = if let Some((_, tone_key)) = TONED_TO_BASE.get(&o_char) {
+            let tone_map = VOWEL_TO_TONED.get(&horn_base)?;
+            *tone_map.get(tone_key)?
+        } else {
+            horn_base
+        };
+
+        if new_o == o_char {
+            return None;
+        }
+
+        self.buffer[o_index] = new_o;
+        self.last_transform_key = None;
+        self.last_w_transform_kind = WTransformKind::None;
+
+        if self.auto_fix_tone {
+            if let Some(action) = self.reposition_tone_if_needed(true, Some(o_index)) {
+                return Some(action);
+            }
+        }
+
+        let delete_count = self.buffer.len().saturating_sub(o_index + 1);
+        let output_text = self.buffer_string_from(o_index);
         Some(KeyTransformAction {
             delete_count,
             text: output_text,
@@ -438,6 +525,26 @@ impl VitypeEngine {
             }
         }
         None
+    }
+
+    fn clear_other_tones(&mut self, except_index: usize, before: usize) -> Option<usize> {
+        let mut earliest: Option<usize> = None;
+        let limit = before.min(self.buffer.len());
+        for idx in 0..limit {
+            if idx == except_index {
+                continue;
+            }
+            let ch = self.buffer[idx];
+            if let Some((base, _)) = TONED_TO_BASE.get(&ch) {
+                if self.buffer[idx] != *base {
+                    self.buffer[idx] = *base;
+                    if earliest.map_or(true, |current| idx < current) {
+                        earliest = Some(idx);
+                    }
+                }
+            }
+        }
+        earliest
     }
 
     fn find_last_matching_vowel_index(

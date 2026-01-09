@@ -39,5 +39,3 @@ mod vni_telex_key_literal_tests {
         assert_eq!(apply_vni_input("uw"), "uw");
     }
 }
-
-

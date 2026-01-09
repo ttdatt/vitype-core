@@ -74,6 +74,36 @@ mod oiw_uiw_transform_tests {
     }
 }
 
+// MARK: - UOI7 Transform Tests (ươi)
+// Bug: 7 should skip 'i' and still apply the uo → ươ compound transform.
+mod uoi7_transform_tests {
+    use super::apply_vni_input;
+
+    #[test]
+    fn testUOI7() {
+        // "uoi7" → "ươi"
+        assert_eq!(apply_vni_input("nguoi7"), "ngươi");
+    }
+
+    #[test]
+    fn testUOI7WithToneAfter7() {
+        // "nguoi72" → "người"
+        assert_eq!(apply_vni_input("nguoi72"), "người");
+    }
+
+    #[test]
+    fn testUOI7WithToneBefore7() {
+        // "nguoi27" → "người"
+        assert_eq!(apply_vni_input("nguoi27"), "người");
+    }
+
+    #[test]
+    fn testUOI7Escape() {
+        // "nguoi77" → "nguoi7" (escape the ươi transform)
+        assert_eq!(apply_vni_input("nguoi77"), "nguoi7");
+    }
+}
+
 // MARK: - UAW Compound Transform Tests (ưa)
 mod uaw_compound_transform_tests {
     use super::apply_vni_input;

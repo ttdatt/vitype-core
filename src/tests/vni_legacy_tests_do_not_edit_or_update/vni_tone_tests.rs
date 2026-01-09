@@ -188,5 +188,3 @@ mod vni_auto_fix_tone_tests {
         assert_eq!(apply_vni_input("hoa2n"), "hoàn");
     }
 }
-
-

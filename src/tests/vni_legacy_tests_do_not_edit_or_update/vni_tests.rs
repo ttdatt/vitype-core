@@ -420,11 +420,11 @@ fn test_vni_giu() {
 fn test_vni_numbers_not_word_boundaries() {
     // In VNI, numbers should trigger transforms, not reset buffer
     let mut engine = create_vni_engine();
-    
+
     // Type "a1" - should produce "á"
     let result1 = engine.process("a");
     assert!(result1.is_none());
-    
+
     let result2 = engine.process("1");
     assert!(result2.is_some());
     // delete_count is 1 because we replace the vowel "a" with "á"

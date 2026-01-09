@@ -422,7 +422,7 @@ mod foreign_consonant_tests {
     fn testWAsConsonantVsStandaloneW() {
         // w without escape becomes ư
         assert_eq!(apply_input("wa"), "ưa"); // w -> ư, then a
-        // ww escapes to w, then a is just vowel
+                                             // ww escapes to w, then a is just vowel
         assert_eq!(apply_input("wwa"), "wa"); // ww -> w, then a
     }
 

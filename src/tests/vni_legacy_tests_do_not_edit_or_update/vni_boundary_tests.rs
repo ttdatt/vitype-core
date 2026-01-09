@@ -44,5 +44,3 @@ mod vni_digits_not_boundaries_tests {
         assert_eq!(apply_vni_input("v2025"), "v2025");
     }
 }
-
-

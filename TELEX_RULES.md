@@ -199,8 +199,9 @@ The `w` key transforms vowels to breve (ă) or horn (ơ, ư) variants:
 **Examples**:
 - `oiw` → `ơi`
 - `uiw` → `ưi`
+- `uoiw` → `ươi` (w skips `i` and applies the `uo` → `ươ` compound transform)
 
-**Escape**: `oiww` → `oiw`, `uiww` → `uiw`
+**Escape**: `oiww` → `oiw`, `uiww` → `uiw`, `uoiww` → `uoiw`
 
 **Override**: After a `w`-transform on `a` or `o`, the circumflex key can override it on the same vowel:
 - `hawa` → `hâ` (ă + a → â)
@@ -484,7 +485,7 @@ The algorithm finds the target vowel in this priority order:
 | tiến | `tieen` + `s` | i, ê | ê is nucleus-only | ti**ế**n |
 | muốn | `muoon` + `s` | u, ô | ô is nucleus-only | mu**ố**n |
 | khuỷa | `khuya` + `r` | u, y, a | Three vowels → middle | khu**ỷ**a |
-| người | `nguoowi` + `f` | ư, ơ, i | ơ is nucleus-only (last) | ngư**ờ**i |
+| người | `nguoiw` + `f` | ư, ơ, i | ơ is nucleus-only (last) | ngư**ờ**i |
 | hướu | `huowwu` + `s` | ư, ơ, u | ơ is nucleus-only (last) | hư**ớ**u |
 | thật | `thaat` + `j` | â | â is nucleus-only | th**ậ**t |
 | nắm | `nawm` + `s` | ă | ă is nucleus-only | n**ắ**m |

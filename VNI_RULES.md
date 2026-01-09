@@ -102,6 +102,12 @@ The `7` key adds a horn to vowels:
 
 **Note**: `7` only transforms `o`, `u`. For other vowels, `7` outputs as a literal character.
 
+**Special behavior**: The `7` key finds the **last transformable vowel** in the buffer (o/u and their horn/toned variants), skipping non-transformable vowels like `i` or `y`. This allows typing:
+
+- `oi7` → `ơi`
+- `ui7` → `ưi`
+- `uoi7` → `ươi` (7 skips `i` and applies the `uo` → `ươ` compound transform)
+
 **No standalone behavior**: Unlike Telex's `w` (which produces `ư` when standalone), `7` alone just outputs `7`.
 
 ### 2.3 Key `8` - Breve Vowel (ă)
@@ -183,10 +189,11 @@ Additional ergonomic variants:
 | `uu7` | ưu     | e.g., `huu7` → `hưu` |
 | `ou7` | ươ     | e.g., `hou7` → `hươ` |
 | `uou7` | ươu   | e.g., `huou7` → `hươu` |
+| `uoi7` | ươi   | e.g., `nguoi7` → `người` |
 | `ua7` | ưa     | e.g., `mua7` → `mưa` |
 | `u7a` | ưa     | e.g., `mu7a` → `mưa` |
 
-**Escape**: `uo77` → `uo7`, `u7a7` → `ua7`
+**Escape**: `uo77` → `uo7`, `uoi77` → `uoi7`, `u7a7` → `ua7`
 
 **Limitations**:
 - Does not apply if `u` or `o` already has a tone mark (e.g., `u2o7` → `ùơ`)

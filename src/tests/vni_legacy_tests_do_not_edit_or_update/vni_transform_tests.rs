@@ -206,5 +206,3 @@ mod vni_compound_7_tests {
         assert_eq!(apply_vni_input("quoc7"), "quơc");
     }
 }
-
-

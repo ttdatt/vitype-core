@@ -2,8 +2,7 @@ use once_cell::sync::Lazy;
 use std::collections::HashMap;
 
 use crate::common::{
-    is_vowel, lower_char, KeyTransformAction, WTransformKind,
-    TONED_TO_BASE, VOWEL_TO_TONED,
+    is_vowel, lower_char, KeyTransformAction, WTransformKind, TONED_TO_BASE, VOWEL_TO_TONED,
 };
 use crate::VitypeEngine;
 
@@ -30,39 +29,115 @@ static VOWEL_TRANSFORMS: Lazy<HashMap<char, Vec<(char, char)>>> = Lazy::new(|| {
     map.insert(
         'w',
         vec![
-            ('a', 'ă'), ('A', 'Ă'),
-            ('ă', 'ă'), ('Ă', 'Ă'),
-            ('o', 'ơ'), ('O', 'Ơ'),
-            ('ô', 'ơ'), ('Ô', 'Ơ'),
-            ('u', 'ư'), ('U', 'Ư'),
-            ('ư', 'ư'), ('Ư', 'Ư'),
-            ('á', 'ắ'), ('à', 'ằ'), ('ả', 'ẳ'), ('ã', 'ẵ'), ('ạ', 'ặ'),
-            ('Á', 'Ắ'), ('À', 'Ằ'), ('Ả', 'Ẳ'), ('Ã', 'Ẵ'), ('Ạ', 'Ặ'),
-            ('ó', 'ớ'), ('ò', 'ờ'), ('ỏ', 'ở'), ('õ', 'ỡ'), ('ọ', 'ợ'),
-            ('Ó', 'Ớ'), ('Ò', 'Ờ'), ('Ỏ', 'Ở'), ('Õ', 'Ỡ'), ('Ọ', 'Ợ'),
-            ('ố', 'ớ'), ('ồ', 'ờ'), ('ổ', 'ở'), ('ỗ', 'ỡ'), ('ộ', 'ợ'),
-            ('Ố', 'Ớ'), ('Ồ', 'Ờ'), ('Ổ', 'Ở'), ('Ỗ', 'Ỡ'), ('Ộ', 'Ợ'),
-            ('ú', 'ứ'), ('ù', 'ừ'), ('ủ', 'ử'), ('ũ', 'ữ'), ('ụ', 'ự'),
-            ('Ú', 'Ứ'), ('Ù', 'Ừ'), ('Ủ', 'Ử'), ('Ũ', 'Ữ'), ('Ụ', 'Ự'),
+            ('a', 'ă'),
+            ('A', 'Ă'),
+            ('ă', 'ă'),
+            ('Ă', 'Ă'),
+            ('o', 'ơ'),
+            ('O', 'Ơ'),
+            ('ô', 'ơ'),
+            ('Ô', 'Ơ'),
+            ('u', 'ư'),
+            ('U', 'Ư'),
+            ('ư', 'ư'),
+            ('Ư', 'Ư'),
+            ('á', 'ắ'),
+            ('à', 'ằ'),
+            ('ả', 'ẳ'),
+            ('ã', 'ẵ'),
+            ('ạ', 'ặ'),
+            ('Á', 'Ắ'),
+            ('À', 'Ằ'),
+            ('Ả', 'Ẳ'),
+            ('Ã', 'Ẵ'),
+            ('Ạ', 'Ặ'),
+            ('ó', 'ớ'),
+            ('ò', 'ờ'),
+            ('ỏ', 'ở'),
+            ('õ', 'ỡ'),
+            ('ọ', 'ợ'),
+            ('Ó', 'Ớ'),
+            ('Ò', 'Ờ'),
+            ('Ỏ', 'Ở'),
+            ('Õ', 'Ỡ'),
+            ('Ọ', 'Ợ'),
+            ('ố', 'ớ'),
+            ('ồ', 'ờ'),
+            ('ổ', 'ở'),
+            ('ỗ', 'ỡ'),
+            ('ộ', 'ợ'),
+            ('Ố', 'Ớ'),
+            ('Ồ', 'Ờ'),
+            ('Ổ', 'Ở'),
+            ('Ỗ', 'Ỡ'),
+            ('Ộ', 'Ợ'),
+            ('ú', 'ứ'),
+            ('ù', 'ừ'),
+            ('ủ', 'ử'),
+            ('ũ', 'ữ'),
+            ('ụ', 'ự'),
+            ('Ú', 'Ứ'),
+            ('Ù', 'Ừ'),
+            ('Ủ', 'Ử'),
+            ('Ũ', 'Ữ'),
+            ('Ụ', 'Ự'),
         ],
     );
     map.insert(
         'W',
         vec![
-            ('a', 'Ă'), ('A', 'Ă'),
-            ('ă', 'Ă'), ('Ă', 'Ă'),
-            ('o', 'Ơ'), ('O', 'Ơ'),
-            ('ô', 'Ơ'), ('Ô', 'Ơ'),
-            ('u', 'Ư'), ('U', 'Ư'),
-            ('ư', 'Ư'), ('Ư', 'Ư'),
-            ('á', 'Ắ'), ('à', 'Ằ'), ('ả', 'Ẳ'), ('ã', 'Ẵ'), ('ạ', 'Ặ'),
-            ('Á', 'Ắ'), ('À', 'Ằ'), ('Ả', 'Ẳ'), ('Ã', 'Ẵ'), ('Ạ', 'Ặ'),
-            ('ó', 'Ớ'), ('ò', 'Ờ'), ('ỏ', 'Ở'), ('õ', 'Ỡ'), ('ọ', 'Ợ'),
-            ('Ó', 'Ớ'), ('Ò', 'Ờ'), ('Ỏ', 'Ở'), ('Õ', 'Ỡ'), ('Ọ', 'Ợ'),
-            ('ố', 'Ớ'), ('ồ', 'Ờ'), ('ổ', 'Ở'), ('ỗ', 'Ỡ'), ('ộ', 'Ợ'),
-            ('Ố', 'Ớ'), ('Ồ', 'Ờ'), ('Ổ', 'Ở'), ('Ỗ', 'Ỡ'), ('Ộ', 'Ợ'),
-            ('ú', 'Ứ'), ('ù', 'Ừ'), ('ủ', 'Ử'), ('ũ', 'Ữ'), ('ụ', 'Ự'),
-            ('Ú', 'Ứ'), ('Ù', 'Ừ'), ('Ủ', 'Ử'), ('Ũ', 'Ữ'), ('Ụ', 'Ự'),
+            ('a', 'Ă'),
+            ('A', 'Ă'),
+            ('ă', 'Ă'),
+            ('Ă', 'Ă'),
+            ('o', 'Ơ'),
+            ('O', 'Ơ'),
+            ('ô', 'Ơ'),
+            ('Ô', 'Ơ'),
+            ('u', 'Ư'),
+            ('U', 'Ư'),
+            ('ư', 'Ư'),
+            ('Ư', 'Ư'),
+            ('á', 'Ắ'),
+            ('à', 'Ằ'),
+            ('ả', 'Ẳ'),
+            ('ã', 'Ẵ'),
+            ('ạ', 'Ặ'),
+            ('Á', 'Ắ'),
+            ('À', 'Ằ'),
+            ('Ả', 'Ẳ'),
+            ('Ã', 'Ẵ'),
+            ('Ạ', 'Ặ'),
+            ('ó', 'Ớ'),
+            ('ò', 'Ờ'),
+            ('ỏ', 'Ở'),
+            ('õ', 'Ỡ'),
+            ('ọ', 'Ợ'),
+            ('Ó', 'Ớ'),
+            ('Ò', 'Ờ'),
+            ('Ỏ', 'Ở'),
+            ('Õ', 'Ỡ'),
+            ('Ọ', 'Ợ'),
+            ('ố', 'Ớ'),
+            ('ồ', 'Ờ'),
+            ('ổ', 'Ở'),
+            ('ỗ', 'Ỡ'),
+            ('ộ', 'Ợ'),
+            ('Ố', 'Ớ'),
+            ('Ồ', 'Ờ'),
+            ('Ổ', 'Ở'),
+            ('Ỗ', 'Ỡ'),
+            ('Ộ', 'Ợ'),
+            ('ú', 'Ứ'),
+            ('ù', 'Ừ'),
+            ('ủ', 'Ử'),
+            ('ũ', 'Ữ'),
+            ('ụ', 'Ự'),
+            ('Ú', 'Ứ'),
+            ('Ù', 'Ừ'),
+            ('Ủ', 'Ử'),
+            ('Ũ', 'Ữ'),
+            ('Ụ', 'Ự'),
         ],
     );
     map
@@ -70,24 +145,78 @@ static VOWEL_TRANSFORMS: Lazy<HashMap<char, Vec<(char, char)>>> = Lazy::new(|| {
 
 static VOWEL_UNTRANSFORMS: Lazy<HashMap<char, (char, char)>> = Lazy::new(|| {
     let mut map = HashMap::new();
-    map.insert('â', ('a', 'a')); map.insert('Â', ('a', 'A'));
-    map.insert('ê', ('e', 'e')); map.insert('Ê', ('e', 'E'));
-    map.insert('ô', ('o', 'o')); map.insert('Ô', ('o', 'O'));
-    map.insert('ă', ('w', 'a')); map.insert('Ă', ('w', 'A'));
-    map.insert('ơ', ('w', 'o')); map.insert('Ơ', ('w', 'O'));
-    map.insert('ư', ('w', 'u')); map.insert('Ư', ('w', 'U'));
-    map.insert('ắ', ('w', 'á')); map.insert('ằ', ('w', 'à')); map.insert('ẳ', ('w', 'ả')); map.insert('ẵ', ('w', 'ã')); map.insert('ặ', ('w', 'ạ'));
-    map.insert('Ắ', ('w', 'Á')); map.insert('Ằ', ('w', 'À')); map.insert('Ẳ', ('w', 'Ả')); map.insert('Ẵ', ('w', 'Ã')); map.insert('Ặ', ('w', 'Ạ'));
-    map.insert('ớ', ('w', 'ó')); map.insert('ờ', ('w', 'ò')); map.insert('ở', ('w', 'ỏ')); map.insert('ỡ', ('w', 'õ')); map.insert('ợ', ('w', 'ọ'));
-    map.insert('Ớ', ('w', 'Ó')); map.insert('Ờ', ('w', 'Ò')); map.insert('Ở', ('w', 'Ỏ')); map.insert('Ỡ', ('w', 'Õ')); map.insert('Ợ', ('w', 'Ọ'));
-    map.insert('ứ', ('w', 'ú')); map.insert('ừ', ('w', 'ù')); map.insert('ử', ('w', 'ủ')); map.insert('ữ', ('w', 'ũ')); map.insert('ự', ('w', 'ụ'));
-    map.insert('Ứ', ('w', 'Ú')); map.insert('Ừ', ('w', 'Ù')); map.insert('Ử', ('w', 'Ủ')); map.insert('Ữ', ('w', 'Ũ')); map.insert('Ự', ('w', 'Ụ'));
-    map.insert('ấ', ('a', 'á')); map.insert('ầ', ('a', 'à')); map.insert('ẩ', ('a', 'ả')); map.insert('ẫ', ('a', 'ã')); map.insert('ậ', ('a', 'ạ'));
-    map.insert('Ấ', ('a', 'Á')); map.insert('Ầ', ('a', 'À')); map.insert('Ẩ', ('a', 'Ả')); map.insert('Ẫ', ('a', 'Ã')); map.insert('Ậ', ('a', 'Ạ'));
-    map.insert('ế', ('e', 'é')); map.insert('ề', ('e', 'è')); map.insert('ể', ('e', 'ẻ')); map.insert('ễ', ('e', 'ẽ')); map.insert('ệ', ('e', 'ẹ'));
-    map.insert('Ế', ('e', 'É')); map.insert('Ề', ('e', 'È')); map.insert('Ể', ('e', 'Ẻ')); map.insert('Ễ', ('e', 'Ẽ')); map.insert('Ệ', ('e', 'Ẹ'));
-    map.insert('ố', ('o', 'ó')); map.insert('ồ', ('o', 'ò')); map.insert('ổ', ('o', 'ỏ')); map.insert('ỗ', ('o', 'õ')); map.insert('ộ', ('o', 'ọ'));
-    map.insert('Ố', ('o', 'Ó')); map.insert('Ồ', ('o', 'Ò')); map.insert('Ổ', ('o', 'Ỏ')); map.insert('Ỗ', ('o', 'Õ')); map.insert('Ộ', ('o', 'Ọ'));
+    map.insert('â', ('a', 'a'));
+    map.insert('Â', ('a', 'A'));
+    map.insert('ê', ('e', 'e'));
+    map.insert('Ê', ('e', 'E'));
+    map.insert('ô', ('o', 'o'));
+    map.insert('Ô', ('o', 'O'));
+    map.insert('ă', ('w', 'a'));
+    map.insert('Ă', ('w', 'A'));
+    map.insert('ơ', ('w', 'o'));
+    map.insert('Ơ', ('w', 'O'));
+    map.insert('ư', ('w', 'u'));
+    map.insert('Ư', ('w', 'U'));
+    map.insert('ắ', ('w', 'á'));
+    map.insert('ằ', ('w', 'à'));
+    map.insert('ẳ', ('w', 'ả'));
+    map.insert('ẵ', ('w', 'ã'));
+    map.insert('ặ', ('w', 'ạ'));
+    map.insert('Ắ', ('w', 'Á'));
+    map.insert('Ằ', ('w', 'À'));
+    map.insert('Ẳ', ('w', 'Ả'));
+    map.insert('Ẵ', ('w', 'Ã'));
+    map.insert('Ặ', ('w', 'Ạ'));
+    map.insert('ớ', ('w', 'ó'));
+    map.insert('ờ', ('w', 'ò'));
+    map.insert('ở', ('w', 'ỏ'));
+    map.insert('ỡ', ('w', 'õ'));
+    map.insert('ợ', ('w', 'ọ'));
+    map.insert('Ớ', ('w', 'Ó'));
+    map.insert('Ờ', ('w', 'Ò'));
+    map.insert('Ở', ('w', 'Ỏ'));
+    map.insert('Ỡ', ('w', 'Õ'));
+    map.insert('Ợ', ('w', 'Ọ'));
+    map.insert('ứ', ('w', 'ú'));
+    map.insert('ừ', ('w', 'ù'));
+    map.insert('ử', ('w', 'ủ'));
+    map.insert('ữ', ('w', 'ũ'));
+    map.insert('ự', ('w', 'ụ'));
+    map.insert('Ứ', ('w', 'Ú'));
+    map.insert('Ừ', ('w', 'Ù'));
+    map.insert('Ử', ('w', 'Ủ'));
+    map.insert('Ữ', ('w', 'Ũ'));
+    map.insert('Ự', ('w', 'Ụ'));
+    map.insert('ấ', ('a', 'á'));
+    map.insert('ầ', ('a', 'à'));
+    map.insert('ẩ', ('a', 'ả'));
+    map.insert('ẫ', ('a', 'ã'));
+    map.insert('ậ', ('a', 'ạ'));
+    map.insert('Ấ', ('a', 'Á'));
+    map.insert('Ầ', ('a', 'À'));
+    map.insert('Ẩ', ('a', 'Ả'));
+    map.insert('Ẫ', ('a', 'Ã'));
+    map.insert('Ậ', ('a', 'Ạ'));
+    map.insert('ế', ('e', 'é'));
+    map.insert('ề', ('e', 'è'));
+    map.insert('ể', ('e', 'ẻ'));
+    map.insert('ễ', ('e', 'ẽ'));
+    map.insert('ệ', ('e', 'ẹ'));
+    map.insert('Ế', ('e', 'É'));
+    map.insert('Ề', ('e', 'È'));
+    map.insert('Ể', ('e', 'Ẻ'));
+    map.insert('Ễ', ('e', 'Ẽ'));
+    map.insert('Ệ', ('e', 'Ẹ'));
+    map.insert('ố', ('o', 'ó'));
+    map.insert('ồ', ('o', 'ò'));
+    map.insert('ổ', ('o', 'ỏ'));
+    map.insert('ỗ', ('o', 'õ'));
+    map.insert('ộ', ('o', 'ọ'));
+    map.insert('Ố', ('o', 'Ó'));
+    map.insert('Ồ', ('o', 'Ò'));
+    map.insert('Ổ', ('o', 'Ỏ'));
+    map.insert('Ỗ', ('o', 'Õ'));
+    map.insert('Ộ', ('o', 'Ọ'));
     map
 });
 
@@ -119,6 +248,11 @@ impl VitypeEngine {
                     }
                 }
                 WTransformKind::CompoundUow => {
+                    if let Some(action) = self.try_escape_compound_horn_key(ch, ch_lower) {
+                        return Some(action);
+                    }
+                }
+                WTransformKind::CompoundUoiw => {
                     if let Some(action) = self.try_escape_compound_horn_key(ch, ch_lower) {
                         return Some(action);
                     }
@@ -228,8 +362,7 @@ impl VitypeEngine {
         }
 
         let trigger_index = self.buffer.len() - 1;
-        let first_d_index =
-            self.find_last_matching_d_index(trigger_index, 4)?;
+        let first_d_index = self.find_last_matching_d_index(trigger_index, 4)?;
 
         let first_d = self.buffer[first_d_index];
         let result = if first_d.is_uppercase() { 'Đ' } else { 'đ' };
@@ -260,6 +393,10 @@ impl VitypeEngine {
             }
 
             if let Some(action) = self.try_compound_uo_final_consonant_w_transform() {
+                return Some(action);
+            }
+
+            if let Some(action) = self.try_compound_uoiw_transform() {
                 return Some(action);
             }
 
@@ -316,7 +453,9 @@ impl VitypeEngine {
 
         if ch_lower == 'a' || ch_lower == 'e' || ch_lower == 'o' {
             if let Some(transforms) = VOWEL_TRANSFORMS.get(&ch) {
-                if let Some(vowel_index) = self.find_last_matching_vowel_index(ch, self.buffer.len() - 1, 4) {
+                if let Some(vowel_index) =
+                    self.find_last_matching_vowel_index(ch, self.buffer.len() - 1, 4)
+                {
                     let vowel = self.buffer[vowel_index];
                     let vowel_base = self.get_base_vowel(vowel);
                     if let Some(transform) = transforms
@@ -342,7 +481,9 @@ impl VitypeEngine {
                         self.last_w_transform_kind = WTransformKind::None;
 
                         if self.auto_fix_tone {
-                            if let Some(action) = self.reposition_tone_if_needed(false, Some(vowel_offset)) {
+                            if let Some(action) =
+                                self.reposition_tone_if_needed(false, Some(vowel_offset))
+                            {
                                 return Some(action);
                             }
                         }
@@ -430,6 +571,73 @@ impl VitypeEngine {
         self.buffer.pop();
         self.last_transform_key = Some('w');
         self.last_w_transform_kind = WTransformKind::CompoundUoFinalConsonantW;
+
+        let delete_count = self.buffer.len() - u_index;
+        let output_text = self.buffer_string_from(u_index);
+        Some(KeyTransformAction {
+            delete_count,
+            text: output_text,
+        })
+    }
+
+    fn try_compound_uoiw_transform(&mut self) -> Option<KeyTransformAction> {
+        if self.buffer.len() < 4 {
+            return None;
+        }
+
+        // Pattern: u o i w  -> ư ơ i  (w skips i and applies the uo → ươ compound transform)
+        let trigger_index = self.buffer.len() - 1;
+        let i_index = trigger_index - 1;
+        let o_index = i_index - 1;
+        let u_index = o_index - 1;
+
+        let i = self.buffer[i_index];
+        if lower_char(i) != 'i' {
+            return None;
+        }
+
+        let raw_u = self.buffer[u_index];
+        let (u_base, u_tone) = if let Some((base, tone)) = TONED_TO_BASE.get(&raw_u) {
+            (*base, Some(*tone))
+        } else {
+            (raw_u, None)
+        };
+
+        let raw_o = self.buffer[o_index];
+        let (o_base, o_tone) = if let Some((base, tone)) = TONED_TO_BASE.get(&raw_o) {
+            (*base, Some(*tone))
+        } else {
+            (raw_o, None)
+        };
+
+        if lower_char(u_base) != 'u' || lower_char(o_base) != 'o' {
+            return None;
+        }
+
+        if u_index > 0 {
+            let prev_char = self.buffer[u_index - 1];
+            if prev_char == 'q' || prev_char == 'Q' {
+                return None;
+            }
+        }
+
+        let u_horn_base = if u_base.is_uppercase() { 'Ư' } else { 'ư' };
+        let o_horn_base = if o_base.is_uppercase() { 'Ơ' } else { 'ơ' };
+
+        let u_horn = match u_tone {
+            Some(tone) => *VOWEL_TO_TONED.get(&u_horn_base)?.get(&tone)?,
+            None => u_horn_base,
+        };
+        let o_horn = match o_tone {
+            Some(tone) => *VOWEL_TO_TONED.get(&o_horn_base)?.get(&tone)?,
+            None => o_horn_base,
+        };
+
+        self.buffer[u_index] = u_horn;
+        self.buffer[o_index] = o_horn;
+        self.buffer.pop();
+        self.last_transform_key = Some('w');
+        self.last_w_transform_kind = WTransformKind::CompoundUoiw;
 
         let delete_count = self.buffer.len() - u_index;
         let output_text = self.buffer_string_from(u_index);

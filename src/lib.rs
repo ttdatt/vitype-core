@@ -1,7 +1,7 @@
 mod common;
+mod ffi;
 mod telex;
 mod vni;
-mod ffi;
 
 use std::collections::VecDeque;
 
@@ -13,9 +13,7 @@ pub(crate) use common::{
 };
 
 // Use internal items from common
-use common::{
-    is_vowel, lower_char, BASE_VOWELS, TONED_TO_BASE, VOWEL_TO_TONED,
-};
+use common::{is_vowel, lower_char, BASE_VOWELS, TONED_TO_BASE, VOWEL_TO_TONED};
 
 // Use internal items from telex and vni
 use telex::is_telex_word_boundary;
@@ -281,10 +279,7 @@ impl VitypeEngine {
         })
     }
 
-    fn try_auto_fix_uhorn_o_before_consonant(
-        &mut self,
-        ch: char,
-    ) -> Option<KeyTransformAction> {
+    fn try_auto_fix_uhorn_o_before_consonant(&mut self, ch: char) -> Option<KeyTransformAction> {
         if is_vowel(ch) {
             return None;
         }
@@ -645,6 +640,68 @@ impl VitypeEngine {
                         text: format!("{}{}{}", original_u, original_o, key_to_push),
                     });
                 }
+            }
+            WTransformKind::CompoundUoiw => {
+                if self.buffer.len() < 3 {
+                    return None;
+                }
+
+                let end_index = self.buffer.len();
+                let i_index = end_index - 1;
+                let o_index = end_index - 2;
+                let u_index = end_index - 3;
+
+                let i_char = self.buffer[i_index];
+                let i_base = if let Some((base, _)) = TONED_TO_BASE.get(&i_char) {
+                    *base
+                } else {
+                    i_char
+                };
+                if lower_char(i_base) != 'i' {
+                    return None;
+                }
+
+                let u_horn = self.buffer[u_index];
+                let (u_base, u_tone) = if let Some((base, tone)) = TONED_TO_BASE.get(&u_horn) {
+                    (*base, Some(*tone))
+                } else {
+                    (u_horn, None)
+                };
+
+                let o_horn = self.buffer[o_index];
+                let (o_base, o_tone) = if let Some((base, tone)) = TONED_TO_BASE.get(&o_horn) {
+                    (*base, Some(*tone))
+                } else {
+                    (o_horn, None)
+                };
+
+                if lower_char(u_base) != 'ư' || lower_char(o_base) != 'ơ' {
+                    return None;
+                }
+
+                let original_u_base = if u_base.is_uppercase() { 'U' } else { 'u' };
+                let original_o_base = if o_base.is_uppercase() { 'O' } else { 'o' };
+
+                let original_u = match u_tone {
+                    Some(tone) => *VOWEL_TO_TONED.get(&original_u_base)?.get(&tone)?,
+                    None => original_u_base,
+                };
+                let original_o = match o_tone {
+                    Some(tone) => *VOWEL_TO_TONED.get(&original_o_base)?.get(&tone)?,
+                    None => original_o_base,
+                };
+
+                self.buffer.drain(u_index..);
+                self.buffer.push(original_u);
+                self.buffer.push(original_o);
+                self.buffer.push(i_char);
+                self.buffer.push(key_to_push);
+                self.clear_last_transform_and_suppress(suppressed_key);
+
+                return Some(KeyTransformAction {
+                    delete_count: 3,
+                    text: format!("{}{}{}{}", original_u, original_o, i_char, key_to_push),
+                });
             }
             WTransformKind::CompoundUoFinalConsonantW => {
                 if self.buffer.len() < 3 {

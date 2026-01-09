@@ -1,5 +1,5 @@
 use once_cell::sync::Lazy;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use crate::common::{
     is_vowel, lower_char, KeyTransformAction, WTransformKind,
@@ -10,30 +10,14 @@ use crate::VitypeEngine;
 // ==================== Telex Helper Functions ====================
 
 fn is_tone_key(ch: char) -> bool {
-    TONE_KEYS.contains(&lower_char(ch))
+    matches!(lower_char(ch), 's' | 'f' | 'r' | 'x' | 'j' | 'z')
 }
 
 pub(super) fn is_telex_word_boundary(ch: char) -> bool {
-    WORD_BOUNDARY_CHARS.contains(&ch)
+    ch.is_ascii_whitespace() || ch.is_ascii_punctuation() || ch.is_ascii_digit()
 }
 
 // ==================== Telex Static Data ====================
-
-static TONE_KEYS: Lazy<HashSet<char>> = Lazy::new(|| {
-    let chars = ['s', 'f', 'r', 'x', 'j', 'z'];
-    chars.iter().cloned().collect()
-});
-
-static WORD_BOUNDARY_CHARS: Lazy<HashSet<char>> = Lazy::new(|| {
-    let chars = [
-        ' ', '\n', '\r', '\t', ',', '.', ';', ':', '!', '?',
-        '(', ')', '[', ']', '{', '}', '"', '\'', '/', '\\',
-        '-', '_', '@', '#', '$', '%', '^', '&', '*', '=', '+',
-        '<', '>', '`', '~', '|',
-        '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
-    ];
-    chars.iter().cloned().collect()
-});
 
 static VOWEL_TRANSFORMS: Lazy<HashMap<char, Vec<(char, char)>>> = Lazy::new(|| {
     let mut map = HashMap::new();
@@ -126,9 +110,7 @@ impl VitypeEngine {
                             let replacement = if last_char.is_uppercase() { 'W' } else { 'w' };
                             self.buffer.pop();
                             self.buffer.push(replacement);
-                            self.last_transform_key = None;
-                            self.last_w_transform_kind = WTransformKind::None;
-                            self.suppressed_transform_key = Some(ch_lower);
+                            self.clear_last_transform_and_suppress(ch_lower);
                             return Some(KeyTransformAction {
                                 delete_count: 1,
                                 text: replacement.to_string(),
@@ -137,85 +119,18 @@ impl VitypeEngine {
                     }
                 }
                 WTransformKind::CompoundUow => {
-                    let end_index = self.buffer.len();
-                    if self.buffer.len() >= 2 {
-                        let o_index = end_index - 1;
-                        let u_index = end_index - 2;
-                        let u_horn = self.buffer[u_index];
-                        let o_horn = self.buffer[o_index];
-                        if (u_horn == 'ư' || u_horn == 'Ư') && (o_horn == 'ơ' || o_horn == 'Ơ') {
-                            let original_u = if u_horn.is_uppercase() { 'U' } else { 'u' };
-                            let original_o = if o_horn.is_uppercase() { 'O' } else { 'o' };
-                            self.buffer.drain(u_index..);
-                            self.buffer.push(original_u);
-                            self.buffer.push(original_o);
-                            self.buffer.push(ch);
-                            self.last_transform_key = None;
-                            self.last_w_transform_kind = WTransformKind::None;
-                            self.suppressed_transform_key = Some(ch_lower);
-                            return Some(KeyTransformAction {
-                                delete_count: 2,
-                                text: format!("{}{}{}", original_u, original_o, ch),
-                            });
-                        }
+                    if let Some(action) = self.try_escape_compound_horn_key(ch, ch_lower) {
+                        return Some(action);
                     }
                 }
                 WTransformKind::CompoundUoFinalConsonantW => {
-                    if self.buffer.len() >= 3 {
-                        let mut o_index = self.buffer.len();
-                        while o_index > 0 {
-                            o_index -= 1;
-                            if is_vowel(self.buffer[o_index]) {
-                                break;
-                            }
-                        }
-                        if o_index < self.buffer.len() && is_vowel(self.buffer[o_index]) {
-                            if o_index == 0 {
-                                return None;
-                            }
-                            let u_index = o_index - 1;
-                            let u_horn = self.buffer[u_index];
-                            let o_horn = self.buffer[o_index];
-                            if (u_horn == 'ư' || u_horn == 'Ư') && (o_horn == 'ơ' || o_horn == 'Ơ') {
-                                let delete_count = self.buffer.len() - u_index;
-                                let original_u = if u_horn.is_uppercase() { 'U' } else { 'u' };
-                                let original_o = if o_horn.is_uppercase() { 'O' } else { 'o' };
-                                self.buffer[u_index] = original_u;
-                                self.buffer[o_index] = original_o;
-                                self.buffer.push(ch);
-                                self.last_transform_key = None;
-                                self.last_w_transform_kind = WTransformKind::None;
-                                self.suppressed_transform_key = Some(ch_lower);
-                                let output_text = self.buffer_string_from(u_index);
-                                return Some(KeyTransformAction {
-                                    delete_count,
-                                    text: output_text,
-                                });
-                            }
-                        }
+                    if let Some(action) = self.try_escape_compound_horn_key(ch, ch_lower) {
+                        return Some(action);
                     }
                 }
                 WTransformKind::CompoundUaw => {
-                    let end_index = self.buffer.len();
-                    if self.buffer.len() >= 2 {
-                        let a_index = end_index - 1;
-                        let u_index = end_index - 2;
-                        let u_horn = self.buffer[u_index];
-                        let a_char = self.buffer[a_index];
-                        if (u_horn == 'ư' || u_horn == 'Ư') && (a_char == 'a' || a_char == 'A') {
-                            let original_u = if u_horn.is_uppercase() { 'U' } else { 'u' };
-                            self.buffer.drain(u_index..);
-                            self.buffer.push(original_u);
-                            self.buffer.push(a_char);
-                            self.buffer.push(ch);
-                            self.last_transform_key = None;
-                            self.last_w_transform_kind = WTransformKind::None;
-                            self.suppressed_transform_key = Some(ch_lower);
-                            return Some(KeyTransformAction {
-                                delete_count: 2,
-                                text: format!("{}{}{}", original_u, a_char, ch),
-                            });
-                        }
+                    if let Some(action) = self.try_escape_compound_horn_key(ch, ch_lower) {
+                        return Some(action);
                     }
                 }
                 WTransformKind::None => {
@@ -225,9 +140,7 @@ impl VitypeEngine {
                         let delete_count = self.buffer.len() - index;
                         self.buffer[index] = original;
                         self.buffer.push(ch);
-                        self.last_transform_key = None;
-                        self.last_w_transform_kind = WTransformKind::None;
-                        self.suppressed_transform_key = Some(ch_lower);
+                        self.clear_last_transform_and_suppress(ch_lower);
                         let output_text = self.buffer_string_from(index);
                         return Some(KeyTransformAction {
                             delete_count,
@@ -255,9 +168,7 @@ impl VitypeEngine {
                     };
                     self.buffer.pop();
                     self.buffer.extend(replacement.chars());
-                    self.last_transform_key = None;
-                    self.last_w_transform_kind = WTransformKind::None;
-                    self.suppressed_transform_key = Some(ch_lower);
+                    self.clear_last_transform_and_suppress(ch_lower);
                     return Some(KeyTransformAction {
                         delete_count: 1,
                         text: replacement,
@@ -272,9 +183,7 @@ impl VitypeEngine {
                     self.buffer.pop();
                     self.buffer.push(*original);
                     self.buffer.push(ch);
-                    self.last_transform_key = None;
-                    self.last_w_transform_kind = WTransformKind::None;
-                    self.suppressed_transform_key = Some(ch_lower);
+                    self.clear_last_transform_and_suppress(ch_lower);
                     return Some(KeyTransformAction {
                         delete_count: 1,
                         text: format!("{}{}", original, ch),
@@ -290,9 +199,7 @@ impl VitypeEngine {
                 let delete_count = self.buffer.len() - index;
                 self.buffer[index] = original;
                 self.buffer.push(ch);
-                self.last_transform_key = None;
-                self.last_w_transform_kind = WTransformKind::None;
-                self.suppressed_transform_key = Some(ch_lower);
+                self.clear_last_transform_and_suppress(ch_lower);
                 let output_text = self.buffer_string_from(index);
                 return Some(KeyTransformAction {
                     delete_count,
@@ -302,23 +209,8 @@ impl VitypeEngine {
         }
 
         if is_tone_key(ch) {
-            if let Some(toned_index) = self.find_last_toned_vowel_index() {
-                if let Some((base_vowel, last_tone)) = TONED_TO_BASE.get(&self.buffer[toned_index])
-                {
-                    if lower_char(*last_tone) == ch_lower {
-                        let delete_count = self.buffer.len() - toned_index;
-                        self.buffer[toned_index] = *base_vowel;
-                        self.buffer.push(ch);
-                        self.last_transform_key = None;
-                        self.last_w_transform_kind = WTransformKind::None;
-                        self.suppressed_transform_key = Some(ch_lower);
-                        let output_text = self.buffer_string_from(toned_index);
-                        return Some(KeyTransformAction {
-                            delete_count,
-                            text: output_text,
-                        });
-                    }
-                }
+            if let Some(action) = self.try_escape_repeated_tone_key(ch, ch_lower, ch_lower) {
+                return Some(action);
             }
         }
 
@@ -474,59 +366,7 @@ impl VitypeEngine {
             return None;
         }
 
-        if self.buffer.is_empty() {
-            return None;
-        }
-
-        let trigger_index = self.buffer.len() - 1;
-        let vowel_index = self.find_target_vowel_index(trigger_index)?;
-        let vowel = self.buffer[vowel_index];
-        let mut start_index = vowel_index;
-        if let Some(earliest) = self.clear_other_tones(vowel_index, trigger_index) {
-            if earliest < start_index {
-                start_index = earliest;
-            }
-        }
-
-        if ch_lower == 'z' {
-            let base_vowel = self.get_base_vowel(vowel);
-            let mut changed = false;
-            if base_vowel != vowel {
-                self.buffer[vowel_index] = base_vowel;
-                changed = true;
-            }
-            if start_index != vowel_index {
-                changed = true;
-            }
-            if !changed {
-                return None;
-            }
-            self.buffer.pop();
-            self.last_transform_key = Some('z');
-            self.last_w_transform_kind = WTransformKind::None;
-            let delete_count = trigger_index - start_index;
-            let output_text = self.buffer_string_from(start_index);
-            return Some(KeyTransformAction {
-                delete_count,
-                text: output_text,
-            });
-        }
-
-        let base_vowel = self.get_base_vowel(vowel);
-        let tone_map = VOWEL_TO_TONED.get(&base_vowel)?;
-        let toned_vowel = tone_map.get(&ch_lower)?;
-
-        self.buffer[vowel_index] = *toned_vowel;
-        self.buffer.pop();
-        self.last_transform_key = Some(ch);
-        self.last_w_transform_kind = WTransformKind::None;
-
-        let delete_count = trigger_index - start_index;
-        let output_text = self.buffer_string_from(start_index);
-        Some(KeyTransformAction {
-            delete_count,
-            text: output_text,
-        })
+        self.apply_tone_mark_internal(ch_lower, ch)
     }
 
     // ==================== Telex Compound Transforms ====================
@@ -704,9 +544,7 @@ impl VitypeEngine {
         let original_u = if u_horn.is_uppercase() { 'U' } else { 'u' };
 
         self.buffer[u_index] = original_u;
-        self.last_transform_key = None;
-        self.last_w_transform_kind = WTransformKind::None;
-        self.suppressed_transform_key = Some('w');
+        self.clear_last_transform_and_suppress('w');
 
         let output_text = self.buffer_string_from(u_index);
         Some(KeyTransformAction {

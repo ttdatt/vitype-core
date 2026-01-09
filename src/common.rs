@@ -47,46 +47,26 @@ pub(crate) struct KeyTransformAction {
 // ==================== Helper Functions ====================
 
 pub(crate) fn lower_char(ch: char) -> char {
+    if ch.is_ascii_uppercase() {
+        return (ch as u8 + 32) as char;
+    }
+    if ch.is_ascii() {
+        return ch;
+    }
     ch.to_lowercase().next().unwrap_or(ch)
 }
 
 pub(crate) fn is_vowel(ch: char) -> bool {
-    VOWELS.contains(&ch)
+    if ch.is_ascii() {
+        let byte = ch as u8;
+        let lower = (byte | 0x20) as char;
+        return matches!(lower, 'a' | 'e' | 'i' | 'o' | 'u' | 'y');
+    }
+
+    BASE_VOWELS.contains(&ch) || TONED_TO_BASE.contains_key(&ch)
 }
 
 // ==================== Shared Static Data ====================
-
-static VOWELS: Lazy<HashSet<char>> = Lazy::new(|| {
-    let chars = [
-        'a', 'ă', 'â', 'e', 'ê', 'i', 'o', 'ô', 'ơ', 'u', 'ư', 'y',
-        'A', 'Ă', 'Â', 'E', 'Ê', 'I', 'O', 'Ô', 'Ơ', 'U', 'Ư', 'Y',
-        'á', 'à', 'ả', 'ã', 'ạ',
-        'ắ', 'ằ', 'ẳ', 'ẵ', 'ặ',
-        'ấ', 'ầ', 'ẩ', 'ẫ', 'ậ',
-        'é', 'è', 'ẻ', 'ẽ', 'ẹ',
-        'ế', 'ề', 'ể', 'ễ', 'ệ',
-        'í', 'ì', 'ỉ', 'ĩ', 'ị',
-        'ó', 'ò', 'ỏ', 'õ', 'ọ',
-        'ố', 'ồ', 'ổ', 'ỗ', 'ộ',
-        'ớ', 'ờ', 'ở', 'ỡ', 'ợ',
-        'ú', 'ù', 'ủ', 'ũ', 'ụ',
-        'ứ', 'ừ', 'ử', 'ữ', 'ự',
-        'ý', 'ỳ', 'ỷ', 'ỹ', 'ỵ',
-        'Á', 'À', 'Ả', 'Ã', 'Ạ',
-        'Ắ', 'Ằ', 'Ẳ', 'Ẵ', 'Ặ',
-        'Ấ', 'Ầ', 'Ẩ', 'Ẫ', 'Ậ',
-        'É', 'È', 'Ẻ', 'Ẽ', 'Ẹ',
-        'Ế', 'Ề', 'Ể', 'Ễ', 'Ệ',
-        'Í', 'Ì', 'Ỉ', 'Ĩ', 'Ị',
-        'Ó', 'Ò', 'Ỏ', 'Õ', 'Ọ',
-        'Ố', 'Ồ', 'Ổ', 'Ỗ', 'Ộ',
-        'Ớ', 'Ờ', 'Ở', 'Ỡ', 'Ợ',
-        'Ú', 'Ù', 'Ủ', 'Ũ', 'Ụ',
-        'Ứ', 'Ừ', 'Ử', 'Ữ', 'Ự',
-        'Ý', 'Ỳ', 'Ỷ', 'Ỹ', 'Ỵ',
-    ];
-    chars.iter().cloned().collect()
-});
 
 pub(crate) static VOWEL_TO_TONED: Lazy<HashMap<char, HashMap<char, char>>> = Lazy::new(|| {
     fn tone_map(entries: &[(char, char)]) -> HashMap<char, char> {
@@ -129,24 +109,6 @@ pub(crate) static TONED_TO_BASE: Lazy<HashMap<char, (char, char)>> = Lazy::new(|
         }
     }
     map
-});
-
-pub(crate) static NUCLEUS_ONLY_VOWELS: Lazy<HashSet<char>> = Lazy::new(|| {
-    let chars = [
-        'ă', 'ắ', 'ằ', 'ẳ', 'ẵ', 'ặ',
-        'Ă', 'Ắ', 'Ằ', 'Ẳ', 'Ẵ', 'Ặ',
-        'â', 'ấ', 'ầ', 'ẩ', 'ẫ', 'ậ',
-        'Â', 'Ấ', 'Ầ', 'Ẩ', 'Ẫ', 'Ậ',
-        'ê', 'ế', 'ề', 'ể', 'ễ', 'ệ',
-        'Ê', 'Ế', 'Ề', 'Ể', 'Ễ', 'Ệ',
-        'ô', 'ố', 'ồ', 'ổ', 'ỗ', 'ộ',
-        'Ô', 'Ố', 'Ồ', 'Ổ', 'Ỗ', 'Ộ',
-        'ơ', 'ớ', 'ờ', 'ở', 'ỡ', 'ợ',
-        'Ơ', 'Ớ', 'Ờ', 'Ở', 'Ỡ', 'Ợ',
-        'ư', 'ứ', 'ừ', 'ử', 'ữ', 'ự',
-        'Ư', 'Ứ', 'Ừ', 'Ử', 'Ữ', 'Ự',
-    ];
-    chars.iter().cloned().collect()
 });
 
 pub(crate) static BASE_VOWELS: Lazy<HashSet<char>> = Lazy::new(|| {

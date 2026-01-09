@@ -1,12 +1,11 @@
 mod common;
 mod telex;
 mod vni;
+mod ffi;
 
 use std::collections::VecDeque;
-use std::ffi::{CStr, CString};
-use std::os::raw::c_char;
-use std::ptr;
-use unicode_normalization::UnicodeNormalization;
+
+pub use ffi::VitypeTransformResult;
 
 // Re-export crate-visible types from common (keep public API surface minimal)
 pub(crate) use common::{
@@ -15,7 +14,7 @@ pub(crate) use common::{
 
 // Use internal items from common
 use common::{
-    is_vowel, lower_char, BASE_VOWELS, NUCLEUS_ONLY_VOWELS, TONED_TO_BASE, VOWEL_TO_TONED,
+    is_vowel, lower_char, BASE_VOWELS, TONED_TO_BASE, VOWEL_TO_TONED,
 };
 
 // Use internal items from telex and vni
@@ -54,7 +53,7 @@ pub struct VitypeEngine {
 }
 
 impl VitypeEngine {
-    fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             buffer: Vec::new(),
             raw_buffer: Vec::new(),
@@ -70,7 +69,53 @@ impl VitypeEngine {
         }
     }
 
-    fn process(&mut self, input: &str) -> Option<KeyTransformAction> {
+    fn return_action_or_fallback(
+        &mut self,
+        action: KeyTransformAction,
+        previous_buffer_count: usize,
+    ) -> Option<KeyTransformAction> {
+        if let Some(fallback) = self.handle_invalid_syllable_if_needed(previous_buffer_count) {
+            return Some(fallback);
+        }
+        Some(action)
+    }
+
+    fn clear_last_transform_state(&mut self) {
+        self.last_transform_key = None;
+        self.last_w_transform_kind = WTransformKind::None;
+    }
+
+    fn clear_transform_state(&mut self) {
+        self.clear_last_transform_state();
+        self.suppressed_transform_key = None;
+    }
+
+    fn clear_last_transform_and_suppress(&mut self, suppressed_key: char) {
+        self.clear_last_transform_state();
+        self.suppressed_transform_key = Some(suppressed_key);
+    }
+
+    pub(crate) fn set_auto_fix_tone(&mut self, enabled: bool) {
+        self.auto_fix_tone = enabled;
+    }
+
+    pub(crate) fn set_input_method(&mut self, method: InputMethod) {
+        self.input_method = method;
+    }
+
+    pub(crate) fn set_output_encoding(&mut self, encoding: OutputEncoding) {
+        self.output_encoding = encoding;
+    }
+
+    pub(crate) fn set_tone_placement(&mut self, placement: TonePlacement) {
+        self.tone_placement = placement;
+    }
+
+    pub(crate) fn output_encoding(&self) -> OutputEncoding {
+        self.output_encoding
+    }
+
+    pub(crate) fn process(&mut self, input: &str) -> Option<KeyTransformAction> {
         let mut chars = input.chars();
         let ch = chars.next()?;
         if chars.next().is_some() {
@@ -100,13 +145,8 @@ impl VitypeEngine {
         }
 
         if let Some(action) = self.try_escape_sequence(ch) {
-            if !self.raw_buffer.is_empty() {
-                self.raw_buffer.pop();
-            }
-            if let Some(fallback) = self.handle_invalid_syllable_if_needed(previous_buffer_count) {
-                return Some(fallback);
-            }
-            return Some(action);
+            self.raw_buffer.pop();
+            return self.return_action_or_fallback(action, previous_buffer_count);
         }
 
         self.buffer.push(ch);
@@ -114,71 +154,36 @@ impl VitypeEngine {
         if self.suppressed_transform_key == Some(ch_lower) {
             if self.auto_fix_tone && is_vowel(ch) {
                 if let Some(action) = self.reposition_tone_if_needed(true, None) {
-                    if let Some(fallback) =
-                        self.handle_invalid_syllable_if_needed(previous_buffer_count)
-                    {
-                        return Some(fallback);
-                    }
-                    return Some(action);
+                    return self.return_action_or_fallback(action, previous_buffer_count);
                 }
             }
-            self.last_transform_key = None;
-            self.last_w_transform_kind = WTransformKind::None;
+            self.clear_last_transform_state();
             return self.handle_invalid_syllable_if_needed(previous_buffer_count);
         }
 
         if let Some(action) = self.try_consonant_transform(ch) {
-            if let Some(fallback) = self.handle_invalid_syllable_if_needed(previous_buffer_count) {
-                return Some(fallback);
-            }
-            return Some(action);
+            return self.return_action_or_fallback(action, previous_buffer_count);
         }
 
         if let Some(action) = self.try_vowel_transform(ch) {
-            if let Some(fallback) = self.handle_invalid_syllable_if_needed(previous_buffer_count) {
-                return Some(fallback);
-            }
-            return Some(action);
+            return self.return_action_or_fallback(action, previous_buffer_count);
         }
 
         if let Some(action) = self.try_tone_mark(ch) {
-            if let Some(fallback) = self.handle_invalid_syllable_if_needed(previous_buffer_count) {
-                return Some(fallback);
-            }
-            return Some(action);
+            return self.return_action_or_fallback(action, previous_buffer_count);
         }
 
         if let Some(action) = self.try_auto_fix_uhorn_o_before_consonant(ch) {
-            if let Some(fallback) = self.handle_invalid_syllable_if_needed(previous_buffer_count) {
-                return Some(fallback);
-            }
-            return Some(action);
+            return self.return_action_or_fallback(action, previous_buffer_count);
         }
 
-        if self.auto_fix_tone && is_vowel(ch) {
+        if self.auto_fix_tone {
             if let Some(action) = self.reposition_tone_if_needed(true, None) {
-                if let Some(fallback) =
-                    self.handle_invalid_syllable_if_needed(previous_buffer_count)
-                {
-                    return Some(fallback);
-                }
-                return Some(action);
+                return self.return_action_or_fallback(action, previous_buffer_count);
             }
         }
 
-        if self.auto_fix_tone && !is_vowel(ch) {
-            if let Some(action) = self.reposition_tone_if_needed(true, None) {
-                if let Some(fallback) =
-                    self.handle_invalid_syllable_if_needed(previous_buffer_count)
-                {
-                    return Some(fallback);
-                }
-                return Some(action);
-            }
-        }
-
-        self.last_transform_key = None;
-        self.last_w_transform_kind = WTransformKind::None;
+        self.clear_last_transform_state();
         self.handle_invalid_syllable_if_needed(previous_buffer_count)
     }
 
@@ -335,8 +340,7 @@ impl VitypeEngine {
         }
 
         self.buffer[o_index] = new_o;
-        self.last_transform_key = None;
-        self.last_w_transform_kind = WTransformKind::None;
+        self.clear_last_transform_state();
 
         if self.auto_fix_tone {
             if let Some(action) = self.reposition_tone_if_needed(true, Some(o_index)) {
@@ -363,9 +367,7 @@ impl VitypeEngine {
         let needs_visible_rewrite = self.buffer != self.raw_buffer;
 
         self.is_foreign_mode = true;
-        self.last_transform_key = None;
-        self.last_w_transform_kind = WTransformKind::None;
-        self.suppressed_transform_key = None;
+        self.clear_transform_state();
 
         self.buffer = self.raw_buffer.clone();
 
@@ -381,139 +383,160 @@ impl VitypeEngine {
     }
 
     fn has_multiple_vowel_clusters(&self, before: usize) -> bool {
-        let vowel_indices = self.effective_vowel_indices(before);
-        if vowel_indices.len() <= 1 {
-            return false;
-        }
+        let mut previous_index: Option<usize> = None;
+        let mut has_gap = false;
 
-        let mut previous = vowel_indices[0];
-        for index in vowel_indices.iter().skip(1) {
-            if *index != previous + 1 {
-                return true;
+        self.for_each_effective_vowel_index(before, |index| {
+            if let Some(previous) = previous_index {
+                if index != previous + 1 {
+                    has_gap = true;
+                    return false;
+                }
             }
-            previous = *index;
-        }
+            previous_index = Some(index);
+            true
+        });
 
-        false
+        has_gap
     }
 
-    fn effective_vowel_indices(&self, before: usize) -> Vec<usize> {
-        let mut all_indices = Vec::new();
-        for idx in 0..before {
-            if is_vowel(self.buffer[idx]) {
-                all_indices.push(idx);
+    fn is_u_vowel_after_q(&self, vowel_index: usize) -> bool {
+        if vowel_index == 0 {
+            return false;
+        }
+        let ch = self.buffer[vowel_index];
+        let base_vowel = self.get_base_vowel(ch);
+        if lower_char(base_vowel) != 'u' {
+            return false;
+        }
+        let prev_char = self.buffer[vowel_index - 1];
+        prev_char == 'q' || prev_char == 'Q'
+    }
+
+    fn is_gi_i_candidate(&self, vowel_index: usize) -> bool {
+        if vowel_index == 0 {
+            return false;
+        }
+        let ch = self.buffer[vowel_index];
+        let base_vowel = self.get_base_vowel(ch);
+        if lower_char(base_vowel) != 'i' {
+            return false;
+        }
+        let prev_char = self.buffer[vowel_index - 1];
+        prev_char == 'g' || prev_char == 'G'
+    }
+
+    fn is_nucleus_only_vowel(&self, ch: char) -> bool {
+        matches!(
+            self.get_base_vowel(ch),
+            'ă' | 'â' | 'ê' | 'ô' | 'ơ' | 'ư' | 'Ă' | 'Â' | 'Ê' | 'Ô' | 'Ơ' | 'Ư'
+        )
+    }
+
+    fn for_each_effective_vowel_index<F>(&self, before: usize, mut f: F)
+    where
+        F: FnMut(usize) -> bool,
+    {
+        let limit = before.min(self.buffer.len());
+        let mut pending_gi_i: Option<usize> = None;
+
+        for index in 0..limit {
+            if !is_vowel(self.buffer[index]) {
+                continue;
+            }
+
+            if pending_gi_i.is_some() {
+                pending_gi_i = None;
+            }
+
+            if self.is_u_vowel_after_q(index) {
+                continue;
+            }
+
+            if self.is_gi_i_candidate(index) {
+                pending_gi_i = Some(index);
+                continue;
+            }
+
+            if !f(index) {
+                return;
             }
         }
 
-        let mut vowel_indices = Vec::new();
-        for (i, &vowel_index) in all_indices.iter().enumerate() {
-            let ch = self.buffer[vowel_index];
-            let base_vowel = self.get_base_vowel(ch);
-            let base_lower = lower_char(base_vowel);
-            let mut skip = false;
-
-            if base_lower == 'u' && vowel_index > 0 {
-                let prev_char = self.buffer[vowel_index - 1];
-                if prev_char == 'q' || prev_char == 'Q' {
-                    skip = true;
-                }
-            }
-
-            if base_lower == 'i' && vowel_index > 0 {
-                let prev_char = self.buffer[vowel_index - 1];
-                if prev_char == 'g' || prev_char == 'G' {
-                    if i < all_indices.len() - 1 {
-                        skip = true;
-                    }
-                }
-            }
-
-            if !skip {
-                vowel_indices.push(vowel_index);
-            }
+        if let Some(index) = pending_gi_i {
+            let _ = f(index);
         }
-
-        vowel_indices
     }
 
     fn find_target_vowel_index(&self, before: usize) -> Option<usize> {
-        let mut all_vowel_indices = Vec::new();
-        for idx in 0..before {
-            if is_vowel(self.buffer[idx]) {
-                all_vowel_indices.push(idx);
-            }
-        }
+        let mut vowel_count = 0usize;
+        let mut first_index: usize = 0;
+        let mut second_index: usize = 0;
+        let mut first_base_lower: char = '\0';
+        let mut second_base_lower: char = '\0';
+        let mut last_nucleus_only_index: Option<usize> = None;
 
-        if all_vowel_indices.is_empty() {
+        self.for_each_effective_vowel_index(before, |index| {
+            vowel_count += 1;
+            if vowel_count == 1 {
+                first_index = index;
+                first_base_lower = lower_char(self.get_base_vowel(self.buffer[index]));
+            } else if vowel_count == 2 {
+                second_index = index;
+                second_base_lower = lower_char(self.get_base_vowel(self.buffer[index]));
+            }
+
+            if self.is_nucleus_only_vowel(self.buffer[index]) {
+                last_nucleus_only_index = Some(index);
+            }
+            true
+        });
+
+        if vowel_count == 0 {
             return None;
         }
 
-        let mut vowel_indices = Vec::new();
-        for (i, &vowel_index) in all_vowel_indices.iter().enumerate() {
-            let ch = self.buffer[vowel_index];
-            let mut skip = false;
-
-            if (ch == 'u' || ch == 'U') && vowel_index > 0 {
-                let prev_char = self.buffer[vowel_index - 1];
-                if prev_char == 'q' || prev_char == 'Q' {
-                    skip = true;
-                }
-            }
-
-            let base_vowel = self.get_base_vowel(ch);
-            let base_lower = lower_char(base_vowel);
-            if base_lower == 'i' && vowel_index > 0 {
-                let prev_char = self.buffer[vowel_index - 1];
-                if prev_char == 'g' || prev_char == 'G' {
-                    if i < all_vowel_indices.len() - 1 {
-                        skip = true;
-                    }
-                }
-            }
-
-            if !skip {
-                vowel_indices.push(vowel_index);
-            }
+        if vowel_count == 1 {
+            return Some(first_index);
         }
 
-        if vowel_indices.len() == 1 {
-            return Some(vowel_indices[0]);
+        if let Some(index) = last_nucleus_only_index {
+            return Some(index);
         }
 
-        for &vowel_index in vowel_indices.iter().rev() {
-            let ch = self.buffer[vowel_index];
-            if NUCLEUS_ONLY_VOWELS.contains(&ch) {
-                return Some(vowel_index);
-            }
-        }
-
-        if vowel_indices.len() == 2 {
+        if vowel_count == 2 {
             if self.tone_placement == TonePlacement::NucleusOnly {
-                let first_vowel = self.buffer[vowel_indices[0]];
-                let second_vowel = self.buffer[vowel_indices[1]];
-                let first_base = lower_char(self.get_base_vowel(first_vowel));
-                let second_base = lower_char(self.get_base_vowel(second_vowel));
-
                 // Nucleus-only overrides for the vowel clusters where the orthographic rules
                 // may place tone on a glide-like vowel ("oa", "oe", "uy").
-                if (first_base == 'u' && second_base == 'y')
-                    || (first_base == 'o' && (second_base == 'a' || second_base == 'e'))
+                if (first_base_lower == 'u' && second_base_lower == 'y')
+                    || (first_base_lower == 'o'
+                        && (second_base_lower == 'a' || second_base_lower == 'e'))
                 {
-                    return Some(vowel_indices[1]);
+                    return Some(second_index);
                 }
             }
 
-            let has_final_consonant = vowel_indices[1] + 1 < before;
+            let has_final_consonant = second_index + 1 < before;
 
             if has_final_consonant {
-                return Some(vowel_indices[1]);
+                return Some(second_index);
             }
 
-            return Some(vowel_indices[0]);
+            return Some(first_index);
         }
 
-        let middle_index = (vowel_indices.len() - 1) / 2;
-        Some(vowel_indices[middle_index])
+        let target_position = (vowel_count - 1) / 2;
+        let mut position = 0usize;
+        let mut target_index: Option<usize> = None;
+        self.for_each_effective_vowel_index(before, |index| {
+            if position == target_position {
+                target_index = Some(index);
+                return false;
+            }
+            position += 1;
+            true
+        });
+        target_index
     }
 
     fn find_last_toned_vowel_index(&self) -> Option<usize> {
@@ -525,6 +548,188 @@ impl VitypeEngine {
             }
         }
         None
+    }
+
+    fn apply_tone_mark_internal(
+        &mut self,
+        tone_key: char,
+        store_last_key: char,
+    ) -> Option<KeyTransformAction> {
+        if self.buffer.is_empty() {
+            return None;
+        }
+
+        let trigger_index = self.buffer.len() - 1;
+        let vowel_index = self.find_target_vowel_index(trigger_index)?;
+        let vowel = self.buffer[vowel_index];
+
+        let mut start_index = vowel_index;
+        if let Some(earliest) = self.clear_other_tones(vowel_index, trigger_index) {
+            if earliest < start_index {
+                start_index = earliest;
+            }
+        }
+
+        if tone_key == 'z' {
+            let base_vowel = self.get_base_vowel(vowel);
+            let mut changed = false;
+            if base_vowel != vowel {
+                self.buffer[vowel_index] = base_vowel;
+                changed = true;
+            }
+            if start_index != vowel_index {
+                changed = true;
+            }
+            if !changed {
+                return None;
+            }
+
+            self.buffer.pop();
+            self.last_transform_key = Some(store_last_key);
+            self.last_w_transform_kind = WTransformKind::None;
+            let delete_count = trigger_index - start_index;
+            let output_text = self.buffer_string_from(start_index);
+            return Some(KeyTransformAction {
+                delete_count,
+                text: output_text,
+            });
+        }
+
+        let base_vowel = self.get_base_vowel(vowel);
+        let tone_map = VOWEL_TO_TONED.get(&base_vowel)?;
+        let toned_vowel = tone_map.get(&tone_key)?;
+
+        self.buffer[vowel_index] = *toned_vowel;
+        self.buffer.pop();
+        self.last_transform_key = Some(store_last_key);
+        self.last_w_transform_kind = WTransformKind::None;
+
+        let delete_count = trigger_index - start_index;
+        let output_text = self.buffer_string_from(start_index);
+        Some(KeyTransformAction {
+            delete_count,
+            text: output_text,
+        })
+    }
+
+    fn try_escape_compound_horn_key(
+        &mut self,
+        key_to_push: char,
+        suppressed_key: char,
+    ) -> Option<KeyTransformAction> {
+        match self.last_w_transform_kind {
+            WTransformKind::CompoundUow => {
+                let end_index = self.buffer.len();
+                if self.buffer.len() < 2 {
+                    return None;
+                }
+
+                let o_index = end_index - 1;
+                let u_index = end_index - 2;
+                let u_horn = self.buffer[u_index];
+                let o_horn = self.buffer[o_index];
+                if (u_horn == 'ư' || u_horn == 'Ư') && (o_horn == 'ơ' || o_horn == 'Ơ') {
+                    let original_u = if u_horn.is_uppercase() { 'U' } else { 'u' };
+                    let original_o = if o_horn.is_uppercase() { 'O' } else { 'o' };
+                    self.buffer.drain(u_index..);
+                    self.buffer.push(original_u);
+                    self.buffer.push(original_o);
+                    self.buffer.push(key_to_push);
+                    self.clear_last_transform_and_suppress(suppressed_key);
+                    return Some(KeyTransformAction {
+                        delete_count: 2,
+                        text: format!("{}{}{}", original_u, original_o, key_to_push),
+                    });
+                }
+            }
+            WTransformKind::CompoundUoFinalConsonantW => {
+                if self.buffer.len() < 3 {
+                    return None;
+                }
+
+                let mut o_index = self.buffer.len();
+                while o_index > 0 {
+                    o_index -= 1;
+                    if is_vowel(self.buffer[o_index]) {
+                        break;
+                    }
+                }
+
+                if o_index >= self.buffer.len() || !is_vowel(self.buffer[o_index]) {
+                    return None;
+                }
+                if o_index == 0 {
+                    return None;
+                }
+
+                let u_index = o_index - 1;
+                let u_horn = self.buffer[u_index];
+                let o_horn = self.buffer[o_index];
+                if (u_horn == 'ư' || u_horn == 'Ư') && (o_horn == 'ơ' || o_horn == 'Ơ') {
+                    let delete_count = self.buffer.len() - u_index;
+                    let original_u = if u_horn.is_uppercase() { 'U' } else { 'u' };
+                    let original_o = if o_horn.is_uppercase() { 'O' } else { 'o' };
+                    self.buffer[u_index] = original_u;
+                    self.buffer[o_index] = original_o;
+                    self.buffer.push(key_to_push);
+                    self.clear_last_transform_and_suppress(suppressed_key);
+                    let output_text = self.buffer_string_from(u_index);
+                    return Some(KeyTransformAction {
+                        delete_count,
+                        text: output_text,
+                    });
+                }
+            }
+            WTransformKind::CompoundUaw => {
+                let end_index = self.buffer.len();
+                if self.buffer.len() < 2 {
+                    return None;
+                }
+
+                let a_index = end_index - 1;
+                let u_index = end_index - 2;
+                let u_horn = self.buffer[u_index];
+                let a_char = self.buffer[a_index];
+                if (u_horn == 'ư' || u_horn == 'Ư') && (a_char == 'a' || a_char == 'A') {
+                    let original_u = if u_horn.is_uppercase() { 'U' } else { 'u' };
+                    self.buffer.drain(u_index..);
+                    self.buffer.push(original_u);
+                    self.buffer.push(a_char);
+                    self.buffer.push(key_to_push);
+                    self.clear_last_transform_and_suppress(suppressed_key);
+                    return Some(KeyTransformAction {
+                        delete_count: 2,
+                        text: format!("{}{}{}", original_u, a_char, key_to_push),
+                    });
+                }
+            }
+            _ => {}
+        }
+
+        None
+    }
+
+    fn try_escape_repeated_tone_key(
+        &mut self,
+        key_to_push: char,
+        internal_tone_key: char,
+        suppressed_key: char,
+    ) -> Option<KeyTransformAction> {
+        let toned_index = self.find_last_toned_vowel_index()?;
+        let (base_vowel, last_tone_key) = TONED_TO_BASE.get(&self.buffer[toned_index])?;
+        if lower_char(*last_tone_key) != internal_tone_key {
+            return None;
+        }
+
+        let delete_count = self.buffer.len() - toned_index;
+        self.buffer[toned_index] = *base_vowel;
+        self.buffer.push(key_to_push);
+        self.clear_last_transform_and_suppress(suppressed_key);
+        let output_text = self.buffer_string_from(toned_index);
+        Some(KeyTransformAction {
+            delete_count,
+            text: output_text,
+        })
     }
 
     fn clear_other_tones(&mut self, except_index: usize, before: usize) -> Option<usize> {
@@ -613,13 +818,11 @@ impl VitypeEngine {
     fn reset_current_word(&mut self) {
         self.buffer.clear();
         self.raw_buffer.clear();
-        self.last_transform_key = None;
-        self.last_w_transform_kind = WTransformKind::None;
-        self.suppressed_transform_key = None;
+        self.clear_transform_state();
         self.is_foreign_mode = false;
     }
 
-    fn reset(&mut self) {
+    pub(crate) fn reset(&mut self) {
         self.reset_current_word();
         self.history.clear();
     }
@@ -681,9 +884,7 @@ impl VitypeEngine {
                 self.buffer = word.buffer;
                 self.raw_buffer = word.raw_buffer;
                 self.is_foreign_mode = word.is_foreign_mode;
-                self.last_transform_key = None;
-                self.last_w_transform_kind = WTransformKind::None;
-                self.suppressed_transform_key = None;
+                self.clear_transform_state();
                 true
             }
             Some(HistorySegment::Boundary(chars)) => {
@@ -694,13 +895,11 @@ impl VitypeEngine {
         }
     }
 
-    fn delete_last_character(&mut self) {
+    pub(crate) fn delete_last_character(&mut self) {
         if !self.buffer.is_empty() {
             self.buffer.pop();
             self.raw_buffer.pop();
-            self.last_transform_key = None;
-            self.last_w_transform_kind = WTransformKind::None;
-            self.suppressed_transform_key = None;
+            self.clear_transform_state();
             self.is_foreign_mode = self.has_multiple_vowel_clusters(self.buffer.len());
             return;
         }
@@ -712,9 +911,7 @@ impl VitypeEngine {
                 if chars.is_empty() {
                     self.history.pop_back();
                 }
-                self.last_transform_key = None;
-                self.last_w_transform_kind = WTransformKind::None;
-                self.suppressed_transform_key = None;
+                self.clear_transform_state();
                 self.is_foreign_mode = false;
 
                 // If we just deleted the last boundary, we're now at the end of the previous word.
@@ -730,9 +927,7 @@ impl VitypeEngine {
                     if !self.buffer.is_empty() {
                         self.buffer.pop();
                         self.raw_buffer.pop();
-                        self.last_transform_key = None;
-                        self.last_w_transform_kind = WTransformKind::None;
-                        self.suppressed_transform_key = None;
+                        self.clear_transform_state();
                         self.is_foreign_mode = self.has_multiple_vowel_clusters(self.buffer.len());
                     }
                 }
@@ -748,154 +943,6 @@ fn is_word_boundary(ch: char, input_method: InputMethod) -> bool {
     match input_method {
         InputMethod::Telex => is_telex_word_boundary(ch),
         InputMethod::Vni => is_vni_word_boundary(ch),
-    }
-}
-
-fn convert_to_output_encoding(text: String, encoding: OutputEncoding) -> String {
-    match encoding {
-        OutputEncoding::Unicode => text,
-        OutputEncoding::CompositeUnicode => text.nfd().collect(),
-    }
-}
-
-// ==================== C FFI ====================
-
-#[repr(C)]
-pub struct VitypeTransformResult {
-    pub has_action: bool,
-    pub delete_count: i32,
-    pub text: *mut c_char,
-}
-
-fn empty_result() -> VitypeTransformResult {
-    VitypeTransformResult {
-        has_action: false,
-        delete_count: 0,
-        text: ptr::null_mut(),
-    }
-}
-
-#[no_mangle]
-pub extern "C" fn vitype_engine_new() -> *mut VitypeEngine {
-    Box::into_raw(Box::new(VitypeEngine::new()))
-}
-
-#[no_mangle]
-pub extern "C" fn vitype_engine_free(engine: *mut VitypeEngine) {
-    if !engine.is_null() {
-        unsafe {
-            drop(Box::from_raw(engine));
-        }
-    }
-}
-
-#[no_mangle]
-pub extern "C" fn vitype_engine_reset(engine: *mut VitypeEngine) {
-    if engine.is_null() {
-        return;
-    }
-    unsafe {
-        (*engine).reset();
-    }
-}
-
-#[no_mangle]
-pub extern "C" fn vitype_engine_delete_last_character(engine: *mut VitypeEngine) {
-    if engine.is_null() {
-        return;
-    }
-    unsafe {
-        (*engine).delete_last_character();
-    }
-}
-
-#[no_mangle]
-pub extern "C" fn vitype_engine_set_auto_fix_tone(engine: *mut VitypeEngine, enabled: bool) {
-    if engine.is_null() {
-        return;
-    }
-    unsafe {
-        (*engine).auto_fix_tone = enabled;
-    }
-}
-
-#[no_mangle]
-pub extern "C" fn vitype_engine_set_input_method(engine: *mut VitypeEngine, method: i32) {
-    if engine.is_null() {
-        return;
-    }
-    unsafe {
-        (*engine).input_method = match method {
-            1 => InputMethod::Vni,
-            _ => InputMethod::Telex,
-        };
-    }
-}
-
-#[no_mangle]
-pub extern "C" fn vitype_engine_set_output_encoding(engine: *mut VitypeEngine, encoding: i32) {
-    if engine.is_null() {
-        return;
-    }
-    unsafe {
-        (*engine).output_encoding = match encoding {
-            1 => OutputEncoding::CompositeUnicode,
-            _ => OutputEncoding::Unicode,
-        };
-    }
-}
-
-#[no_mangle]
-pub extern "C" fn vitype_engine_set_tone_placement(engine: *mut VitypeEngine, placement: i32) {
-    if engine.is_null() {
-        return;
-    }
-    unsafe {
-        (*engine).tone_placement = match placement {
-            1 => TonePlacement::NucleusOnly,
-            _ => TonePlacement::Orthographic,
-        };
-    }
-}
-
-#[no_mangle]
-pub extern "C" fn vitype_engine_process(
-    engine: *mut VitypeEngine,
-    input_utf8: *const c_char,
-) -> VitypeTransformResult {
-    if engine.is_null() || input_utf8.is_null() {
-        return empty_result();
-    }
-
-    let input = unsafe { CStr::from_ptr(input_utf8) };
-    let input_str = match input.to_str() {
-        Ok(value) => value,
-        Err(_) => return empty_result(),
-    };
-
-    let (action, output_encoding) =
-        unsafe { ((*engine).process(input_str), (*engine).output_encoding) };
-    match action {
-        Some(action) => {
-            let output_text = convert_to_output_encoding(action.text, output_encoding);
-            let c_text = CString::new(output_text).unwrap_or_else(|_| CString::new("").unwrap());
-            VitypeTransformResult {
-                has_action: true,
-                delete_count: action.delete_count as i32,
-                text: c_text.into_raw(),
-            }
-        }
-        None => empty_result(),
-    }
-}
-
-#[no_mangle]
-pub extern "C" fn vitype_engine_free_string(text: *mut c_char) {
-    if text.is_null() {
-        return;
-    }
-    unsafe {
-        drop(CString::from_raw(text));
     }
 }
 

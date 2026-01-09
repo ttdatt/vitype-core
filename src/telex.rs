@@ -610,7 +610,8 @@ impl VitypeEngine {
             (raw_o, None)
         };
 
-        if lower_char(u_base) != 'u' || lower_char(o_base) != 'o' {
+        let u_base_lower = lower_char(u_base);
+        if (u_base_lower != 'u' && u_base_lower != 'ư') || lower_char(o_base) != 'o' {
             return None;
         }
 
@@ -638,6 +639,12 @@ impl VitypeEngine {
         self.buffer.pop();
         self.last_transform_key = Some('w');
         self.last_w_transform_kind = WTransformKind::CompoundUoiw;
+
+        if self.auto_fix_tone {
+            if let Some(action) = self.reposition_tone_if_needed(false, Some(u_index)) {
+                return Some(action);
+            }
+        }
 
         let delete_count = self.buffer.len() - u_index;
         let output_text = self.buffer_string_from(u_index);

@@ -86,6 +86,12 @@ mod uoi7_transform_tests {
     }
 
     #[test]
+    fn testUOI7WithLeading7() {
+        assert_eq!(apply_vni_input("ngu7oi"), "ngưoi");
+        assert_eq!(apply_vni_input("ngu7oi7"), "ngươi");
+    }
+
+    #[test]
     fn testUOI7WithToneAfter7() {
         // "nguoi72" → "người"
         assert_eq!(apply_vni_input("nguoi72"), "người");
@@ -95,6 +101,11 @@ mod uoi7_transform_tests {
     fn testUOI7WithToneBefore7() {
         // "nguoi27" → "người"
         assert_eq!(apply_vni_input("nguoi27"), "người");
+    }
+
+    #[test]
+    fn testUOI7WithToneOnLeading7() {
+        assert_eq!(apply_vni_input("ngu72oi7"), "người");
     }
 
     #[test]

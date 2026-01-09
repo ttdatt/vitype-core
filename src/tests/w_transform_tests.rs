@@ -83,6 +83,14 @@ mod uoiw_transform_tests {
     fn testUOIW() {
         // "uoiw" → "ươi"
         assert_eq!(apply_input("nguoiw"), "ngươi");
+        assert_eq!(apply_input("ngwoiw"), "ngươi");
+        assert_eq!(apply_input("nguwoiw"), "ngươi");
+    }
+
+    #[test]
+    fn testUOIWWithLeadingW() {
+        assert_eq!(apply_input("ngwoi"), "ngưoi");
+        assert_eq!(apply_input("nguwoi"), "ngưoi");
     }
 
     #[test]
@@ -95,6 +103,12 @@ mod uoiw_transform_tests {
     fn testUOIWWithToneBeforeW() {
         // "nguoifw" → "người"
         assert_eq!(apply_input("nguoifw"), "người");
+    }
+
+    #[test]
+    fn testUOIWWithToneOnLeadingW() {
+        assert_eq!(apply_input("ngwfoiw"), "người");
+        assert_eq!(apply_input("nguwfoiw"), "người");
     }
 
     #[test]

@@ -771,6 +771,10 @@ mod compound_uow_transform_tests {
         assert_eq!(apply_input("hwouw"), "hươu");
         assert_eq!(apply_input("huwouw"), "hươu");
 
+        // Regressions: tone typed before the compound "w" still lands on "ơ".
+        assert_eq!(apply_input("huousw"), "hướu");
+        assert_eq!(apply_input("huwsouw"), "hướu");
+
         let r1 = apply_input("houwu");
         assert_eq!(r1, "hươu");
 

@@ -767,6 +767,10 @@ mod compound_uow_transform_tests {
         // Regression: pre-horned u (via u7) must still form "hươu".
         assert_eq!(apply_vni_input("hu7ou7"), "hươu");
 
+        // Regression: tone typed before the compound "7" still lands on "ơ".
+        assert_eq!(apply_vni_input("huo1u7"), "hướu");
+        assert_eq!(apply_vni_input("hu71ou7"), "hướu");
+
         let r1 = apply_vni_input("hou7u");
         assert_eq!(r1, "hươu");
 

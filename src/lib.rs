@@ -775,8 +775,11 @@ impl VitypeEngine {
             (raw_last_u, None)
         };
 
-        // Keep existing behavior: this compound doesn't apply if any vowel already has a tone.
-        if first_u_tone.is_some() || o_tone.is_some() || last_u_tone.is_some() {
+        let tone_count = [first_u_tone, o_tone, last_u_tone]
+            .iter()
+            .filter(|tone| tone.is_some())
+            .count();
+        if tone_count > 1 {
             return None;
         }
 
@@ -795,18 +798,38 @@ impl VitypeEngine {
             }
         }
 
-        let u_horn = if first_u_base.is_uppercase() {
+        let u_horn_base = if first_u_base.is_uppercase() {
             'Ư'
         } else {
             'ư'
         };
-        let o_horn = if o_base.is_uppercase() { 'Ơ' } else { 'ơ' };
+        let o_horn_base = if o_base.is_uppercase() { 'Ơ' } else { 'ơ' };
+
+        let u_horn = match first_u_tone {
+            Some(tone) => *VOWEL_TO_TONED.get(&u_horn_base)?.get(&tone)?,
+            None => u_horn_base,
+        };
+        let o_horn = match o_tone {
+            Some(tone) => *VOWEL_TO_TONED.get(&o_horn_base)?.get(&tone)?,
+            None => o_horn_base,
+        };
+        let last_u = match last_u_tone {
+            Some(tone) => *VOWEL_TO_TONED.get(&last_u_base)?.get(&tone)?,
+            None => last_u_base,
+        };
 
         self.buffer[first_u_index] = u_horn;
         self.buffer[o_index] = o_horn;
+        self.buffer[last_u_index] = last_u;
         self.buffer.pop();
         self.last_transform_key = Some(trigger_key);
         self.last_w_transform_kind = WTransformKind::CompoundUow;
+
+        if self.auto_fix_tone {
+            if let Some(action) = self.reposition_tone_if_needed(false, Some(first_u_index)) {
+                return Some(action);
+            }
+        }
 
         let delete_count = self.buffer.len() - first_u_index;
         let output_text = self.buffer_string_from(first_u_index);

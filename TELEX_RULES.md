@@ -250,6 +250,7 @@ Additional ergonomic variants are supported:
 - `ouw` → `ươ` (e.g., `houw` → `hươ`)
 - `uouw` → `ươu` (e.g., `huouw` → `hươu`)
 - Works even if the first `u` is already `ư` from an earlier transform (e.g., `huwouw` / `hwouw` → `hươu`)
+- Tone keys typed before the compound `w` still land on `ơ` (e.g., `huousw` / `huwsouw` → `hướu`)
 - `uaw` → `ưa` (e.g., `muaw` → `mưa`)
 - `uwa` → `ưa` (e.g., `muwa` → `mưa`)
 

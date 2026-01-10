@@ -205,6 +205,8 @@ Additional ergonomic variants:
 | `ua7` | ưa     | e.g., `mua7` → `mưa` |
 | `u7a` | ưa     | e.g., `mu7a` → `mưa` |
 
+Tone keys typed before the compound `7` still land on `ơ` (e.g., `huo1u7` / `hu71ou7` → `hướu`).
+
 **Escape**: `uo77` → `uo7`, `uoi77` → `uoi7`, `u7a7` → `ua7`
 
 **Limitations**:

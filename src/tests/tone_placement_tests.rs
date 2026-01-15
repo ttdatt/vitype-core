@@ -48,10 +48,9 @@ mod auto_fix_tone_tests {
         let tone_action = transformer.process("f");
         assert_eq!(tone_action, Some(action(2, "ùa")));
 
-        // "mùa" + "i" → "muài" (tone moves to a, 3 vowels → middle)
-        // Screen shows "mùa", we need to delete 2 chars ("ùa") and insert "uài"
+        // "mùa" + "i" → "mùai" (uai is not a valid tone cluster, so tone does not move)
         let fix_action = transformer.process("i");
-        assert_eq!(fix_action, Some(action(2, "uài")));
+        assert_eq!(fix_action, None);
     }
 
     #[test]
@@ -134,9 +133,9 @@ mod auto_fix_tone_tests {
 
     #[test]
     fn testAutoFixToneEndToEndMuai() {
-        // Type "muafi" -> should produce "muài"
+        // Type "muafi" -> should produce "mùai" (uai is not a valid tone cluster)
         let result = apply_input("muafi");
-        assert_eq!(result, "muài");
+        assert_eq!(result, "mùai");
     }
 
     #[test]

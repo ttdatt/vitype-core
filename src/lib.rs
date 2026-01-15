@@ -941,6 +941,89 @@ impl VitypeEngine {
         )
     }
 
+    fn normalize_vowel_for_cluster(ch: char) -> Option<char> {
+        let lower = lower_char(ch);
+        Some(match lower {
+            'a' | 'e' | 'i' | 'o' | 'u' | 'y' => lower,
+            'ă' | 'â' => 'a',
+            'ê' => 'e',
+            'ô' | 'ơ' => 'o',
+            'ư' => 'u',
+            _ => return None,
+        })
+    }
+
+    fn is_valid_vowel_cluster_chars(cluster: &[char]) -> bool {
+        match cluster {
+            ['a', 'i']
+            | ['a', 'o']
+            | ['a', 'u']
+            | ['a', 'y']
+            | ['e', 'o']
+            | ['e', 'u']
+            | ['i', 'u']
+            | ['i', 'a']
+            | ['i', 'e']
+            | ['y', 'e']
+            | ['o', 'a']
+            | ['o', 'e']
+            | ['o', 'i']
+            | ['u', 'a']
+            | ['u', 'o']
+            | ['u', 'e']
+            | ['u', 'i']
+            | ['u', 'y']
+            | ['u', 'u']
+            | ['i', 'e', 'u']
+            | ['y', 'e', 'u']
+            | ['o', 'a', 'i']
+            | ['o', 'a', 'y']
+            | ['u', 'o', 'i']
+            | ['u', 'y', 'a']
+            | ['u', 'y', 'e']
+            | ['u', 'o', 'u'] => true,
+            _ => false,
+        }
+    }
+
+    fn is_valid_tone_cluster(&self, before: usize) -> bool {
+        let mut vowel_indices: Vec<usize> = Vec::new();
+        self.for_each_effective_vowel_index(before, |index| {
+            vowel_indices.push(index);
+            true
+        });
+
+        if vowel_indices.is_empty() {
+            return false;
+        }
+
+        if vowel_indices.len() == 1 {
+            return true;
+        }
+
+        if vowel_indices.len() > 3 {
+            return false;
+        }
+
+        for window in vowel_indices.windows(2) {
+            if window[1] != window[0] + 1 {
+                return false;
+            }
+        }
+
+        let mut cluster: Vec<char> = Vec::with_capacity(vowel_indices.len());
+        for index in vowel_indices {
+            let base_vowel = self.get_base_vowel(self.buffer[index]);
+            let normalized = match Self::normalize_vowel_for_cluster(base_vowel) {
+                Some(ch) => ch,
+                None => return false,
+            };
+            cluster.push(normalized);
+        }
+
+        Self::is_valid_vowel_cluster_chars(&cluster)
+    }
+
     fn for_each_effective_vowel_index<F>(&self, before: usize, mut f: F)
     where
         F: FnMut(usize) -> bool,
@@ -977,6 +1060,10 @@ impl VitypeEngine {
     }
 
     fn find_target_vowel_index(&self, before: usize) -> Option<usize> {
+        if !self.is_valid_tone_cluster(before) {
+            return None;
+        }
+
         let mut vowel_count = 0usize;
         let mut first_index: usize = 0;
         let mut second_index: usize = 0;

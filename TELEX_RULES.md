@@ -478,6 +478,32 @@ Examples:
 | `thatae` | thatae | Second vowel cluster invalidates the syllable |
 | `thoio` | thôi | Single vowel cluster (`oi`) remains valid |
 
+### 4.1.2 Valid Vowel Clusters for Tone Marks
+
+Tone marks are only applied when the **effective vowel cluster** (after `qu`/`gi` skips) is a valid Vietnamese cluster. If the cluster is not valid, tone keys are treated as literal characters.
+
+**Valid 2-letter clusters**:
+
+`ai`, `ao`, `au`, `ay`  
+`âu`, `ây`  
+`eo`, `êu`  
+`iu`  
+`ia`, `iê`, `yê`  
+`oa`, `oă`, `oe`, `oi`, `ôi`, `ơi`  
+`ua`, `uô`, `uâ`, `uê`  
+`ui`, `uy`  
+`ưa`, `ươ`, `ưi`, `ưu`
+
+**Valid 3-letter clusters**:
+
+`iêu`, `yêu`  
+`oai`, `oay`  
+`uôi`  
+`uya`, `uyê`  
+`ươi`, `ươu`
+
+**Note**: Non-accented variants of any accented cluster are also valid (e.g., `êu` → `eu`, `ươ` → `uo`, `ươu` → `uou`). Single vowels always accept tones.
+
 ### 4.2 Nucleus-Only Vowels
 
 These vowels can **ONLY** be syllable nuclei - they can never act as glides:
